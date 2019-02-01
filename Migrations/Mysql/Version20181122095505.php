@@ -6,11 +6,11 @@ namespace Neos\Flow\Persistence\Doctrine\Migrations;
 use Doctrine\DBAL\Migrations\AbstractMigration;
 use Doctrine\DBAL\Schema\Schema;
 
-class Version20180228115838 extends AbstractMigration
+class Version20181122095505 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Create neos_contentgraph_referencerelation table';
+        return 'Create restriction edge';
     }
 
     public function up(Schema $schema)
@@ -18,12 +18,12 @@ class Version20180228115838 extends AbstractMigration
         $this->abortIf($this->connection->getDatabasePlatform()->getName() != 'mysql',
             'Migration can only be executed safely on "mysql".');
         $this->addSql('
-            CREATE TABLE neos_contentgraph_referencerelation (
-                name VARCHAR(255) NOT NULL,
-                position INT(11) NOT NULL,
-                nodeanchorpoint VARCHAR(255) NOT NULL,
-                destinationnodeaggregateidentifier VARCHAR(255) NOT NULL,
-                PRIMARY KEY(name, position, nodeanchorpoint)
+        CREATE TABLE neos_contentgraph_restrictionedge (
+                contentstreamidentifier VARCHAR(255) NOT NULL,
+                dimensionspacepointhash VARCHAR(255) NOT NULL,
+                originnodeaggregateidentifier VARCHAR(255) NOT NULL,
+                affectednodeaggregateidentifier VARCHAR(255) NOT NULL,
+                PRIMARY KEY(contentstreamidentifier, dimensionspacepointhash, originnodeaggregateidentifier, affectednodeaggregateidentifier)
             ) 
             DEFAULT CHARACTER SET utf8 
             COLLATE utf8_unicode_ci ENGINE = InnoDB
@@ -35,6 +35,6 @@ class Version20180228115838 extends AbstractMigration
         $this->abortIf($this->connection->getDatabasePlatform()->getName() != 'mysql',
             'Migration can only be executed safely on "mysql".');
 
-        $this->addSql('DROP TABLE neos_contentgraph_referencerelation');
+        $this->addSql('DROP TABLE neos_contentgraph_restrictionedge');
     }
 }
