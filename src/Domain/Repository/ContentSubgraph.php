@@ -14,23 +14,22 @@ namespace Neos\ContentGraph\DoctrineDbalAdapter\Domain\Repository;
  */
 use Doctrine\DBAL\Connection;
 use Neos\ContentRepository\DimensionSpace\DimensionSpace\DimensionSpacePoint;
-use Neos\ContentRepository\Domain\NodeType\NodeTypeConstraintFactory;
-use Neos\ContentRepository\Domain\ContentStream\ContentStreamIdentifier;
-use Neos\ContentRepository\Domain\ContentSubgraph\NodePath;
-use Neos\EventSourcedContentRepository\Domain\Context\NodeAggregate\NodeAggregateIdentifiers;
-use Neos\EventSourcedContentRepository\Domain\Context\Parameters\VisibilityConstraints;
-use Neos\EventSourcedContentRepository\Domain\Projection\Content\ContentSubgraphInterface;
-use Neos\EventSourcedContentRepository\Domain\Projection\Content\InMemoryCache;
-use Neos\EventSourcedContentRepository\Domain\Projection\Content\NodeInterface;
-use Neos\EventSourcedContentRepository\Domain\Projection\Content\Nodes;
-use Neos\EventSourcedContentRepository\Domain\ValueObject\PropertyName;
-use Neos\EventSourcedContentRepository\Service\Infrastructure\Service\DbalClient;
-use Neos\EventSourcedContentRepository\Domain as ContentRepository;
-use Neos\EventSourcedContentRepository\Domain\Context\ContentSubgraph\SubtreeInterface;
-use Neos\ContentRepository\Domain\NodeAggregate\NodeAggregateIdentifier;
-use Neos\ContentRepository\Domain\NodeAggregate\NodeName;
-use Neos\ContentRepository\Domain\NodeType\NodeTypeConstraints;
-use Neos\Flow\Annotations as Flow;
+use Neos\ContentRepository\Feature\Common\NodeTypeNotFoundException;
+use Neos\ContentRepository\Infrastructure\DbalClientInterface;
+use Neos\ContentRepository\SharedModel\NodeType\NodeTypeConstraintFactory;
+use Neos\ContentRepository\SharedModel\Workspace\ContentStreamIdentifier;
+use Neos\ContentRepository\SharedModel\Node\NodePath;
+use Neos\ContentRepository\SharedModel\Node\NodeAggregateIdentifiers;
+use Neos\ContentRepository\SharedModel\VisibilityConstraints;
+use Neos\ContentRepository\Projection\Content\ContentSubgraphInterface;
+use Neos\ContentRepository\Projection\Content\InMemoryCache;
+use Neos\ContentRepository\Projection\Content\NodeInterface;
+use Neos\ContentRepository\Projection\Content\Nodes;
+use Neos\ContentRepository\SharedModel\Node\PropertyName;
+use Neos\ContentRepository\Feature\SubtreeInterface;
+use Neos\ContentRepository\SharedModel\Node\NodeAggregateIdentifier;
+use Neos\ContentRepository\SharedModel\Node\NodeName;
+use Neos\ContentRepository\SharedModel\NodeType\NodeTypeConstraints;
 use Neos\Utility\Unicode\Functions as UnicodeFunctions;
 
 /**
@@ -56,52 +55,20 @@ use Neos\Utility\Unicode\Functions as UnicodeFunctions;
  */
 final class ContentSubgraph implements ContentSubgraphInterface
 {
-    /**
-     * @Flow\Inject
-     * @var DbalClient
-     */
-    protected $client;
-
-    /**
-     * @Flow\Inject
-     * @var NodeTypeConstraintFactory
-     */
-    protected $nodeTypeConstraintFactory;
-
-    /**
-     * @Flow\Inject
-     * @var NodeFactory
-     */
-    protected $nodeFactory;
 
     /**
      * @var InMemoryCache
      */
     protected $inMemoryCache;
 
-    /**
-     * @var ContentStreamIdentifier
-     */
-    protected $contentStreamIdentifier;
-
-    /**
-     * @var DimensionSpacePoint
-     */
-    protected $dimensionSpacePoint;
-
-    /**
-     * @var ContentRepository\Context\Parameters\VisibilityConstraints
-     */
-    protected $visibilityConstraints;
 
     public function __construct(
-        ContentStreamIdentifier $contentStreamIdentifier,
-        DimensionSpacePoint $dimensionSpacePoint,
-        VisibilityConstraints $visibilityConstraints
+        private readonly ContentStreamIdentifier $contentStreamIdentifier,
+        private readonly DimensionSpacePoint $dimensionSpacePoint,
+        private readonly VisibilityConstraints $visibilityConstraints,
+        private readonly DbalClientInterface $client,
+        private readonly NodeFactory $nodeFactory
     ) {
-        $this->contentStreamIdentifier = $contentStreamIdentifier;
-        $this->dimensionSpacePoint = $dimensionSpacePoint;
-        $this->visibilityConstraints = $visibilityConstraints;
         $this->inMemoryCache = new InMemoryCache();
     }
 
@@ -120,23 +87,23 @@ final class ContentSubgraph implements ContentSubgraphInterface
         string $concatenation = 'AND'
     ): void {
         if ($nodeTypeConstraints) {
-            if (!empty($nodeTypeConstraints->getExplicitlyAllowedNodeTypeNames())) {
+            if (!$nodeTypeConstraints->explicitlyAllowedNodeTypeNames->isEmpty()) {
                 $allowanceQueryPart = ($tableReference ? $tableReference . '.' : '')
                     . 'nodetypename IN (:explicitlyAllowedNodeTypeNames)';
                 $query->parameter(
                     'explicitlyAllowedNodeTypeNames',
-                    $nodeTypeConstraints->getExplicitlyAllowedNodeTypeNames(),
+                    $nodeTypeConstraints->explicitlyAllowedNodeTypeNames,
                     Connection::PARAM_STR_ARRAY
                 );
             } else {
                 $allowanceQueryPart = '';
             }
-            if (!empty($nodeTypeConstraints->getExplicitlyDisallowedNodeTypeNames())) {
+            if (!$nodeTypeConstraints->explicitlyDisallowedNodeTypeNames->isEmpty()) {
                 $disAllowanceQueryPart = ($tableReference ? $tableReference . '.' : '')
                     . 'nodetypename NOT IN (:explicitlyDisallowedNodeTypeNames)';
                 $query->parameter(
                     'explicitlyDisallowedNodeTypeNames',
-                    $nodeTypeConstraints->getExplicitlyDisallowedNodeTypeNames(),
+                    $nodeTypeConstraints->explicitlyDisallowedNodeTypeNames,
                     Connection::PARAM_STR_ARRAY
                 );
             } else {
@@ -146,10 +113,10 @@ final class ContentSubgraph implements ContentSubgraphInterface
             if ($allowanceQueryPart && $disAllowanceQueryPart) {
                 $query->addToQuery(
                     ' ' . $concatenation .' (' . $allowanceQueryPart
-                        . ($nodeTypeConstraints->isWildcardAllowed() ? ' OR ' : ' AND ') . $disAllowanceQueryPart . ')',
+                        . ($nodeTypeConstraints->isWildCardAllowed ? ' OR ' : ' AND ') . $disAllowanceQueryPart . ')',
                     $markerToReplaceInQuery
                 );
-            } elseif ($allowanceQueryPart && !$nodeTypeConstraints->isWildcardAllowed()) {
+            } elseif ($allowanceQueryPart && !$nodeTypeConstraints->isWildCardAllowed) {
                 $query->addToQuery(
                     ' ' . $concatenation .' ' . $allowanceQueryPart,
                     $markerToReplaceInQuery
@@ -167,7 +134,7 @@ final class ContentSubgraph implements ContentSubgraphInterface
 
     protected static function addSearchTermConstraintsToQuery(
         SqlQueryBuilder $query,
-        ?ContentRepository\Projection\Content\SearchTerm $searchTerm,
+        ?\Neos\ContentRepository\Projection\Content\SearchTerm $searchTerm,
         string $markerToReplaceInQuery = null,
         string $tableReference = 'c',
         string $concatenation = 'AND'
@@ -957,8 +924,8 @@ WHERE
 
     /**
      * @throws \Doctrine\DBAL\DBALException
-     * @throws \Neos\ContentRepository\Exception\NodeConfigurationException
-     * @throws \Neos\ContentRepository\Exception\NodeTypeNotFoundException
+     * @throws \Neos\ContentRepository\Feature\Common\NodeConfigurationException
+     * @throws NodeTypeNotFoundException
      */
     public function findSubtrees(
         NodeAggregateIdentifiers $entryNodeAggregateIdentifiers,
@@ -1095,12 +1062,12 @@ order by level asc, position asc;')
     /**
      * @param array<int|string,NodeAggregateIdentifier> $entryNodeAggregateIdentifiers
      * @throws \Doctrine\DBAL\Exception
-     * @throws \Neos\ContentRepository\Exception\NodeTypeNotFoundException
+     * @throws NodeTypeNotFoundException
      */
     public function findDescendants(
         array $entryNodeAggregateIdentifiers,
         NodeTypeConstraints $nodeTypeConstraints,
-        ?ContentRepository\Projection\Content\SearchTerm $searchTerm
+        ?\Neos\ContentRepository\Projection\Content\SearchTerm $searchTerm
     ): Nodes {
         $query = new SqlQueryBuilder();
         $query->addToQuery('

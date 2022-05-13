@@ -24,25 +24,26 @@ use Neos\ContentGraph\DoctrineDbalAdapter\Domain\Projection\Feature\RestrictionR
 use Neos\ContentGraph\DoctrineDbalAdapter\Domain\Repository\ProjectionContentGraph;
 use Neos\ContentRepository\DimensionSpace\DimensionSpace\DimensionSpacePoint;
 use Neos\ContentRepository\DimensionSpace\DimensionSpace\DimensionSpacePointSet;
-use Neos\ContentRepository\Domain\ContentStream\ContentStreamIdentifier;
-use Neos\ContentRepository\Domain\NodeAggregate\NodeAggregateIdentifier;
-use Neos\ContentRepository\Domain\NodeAggregate\NodeName;
-use Neos\ContentRepository\Domain\NodeType\NodeTypeName;
-use Neos\EventSourcedContentRepository\Domain\Context\ContentStream\Event\ContentStreamWasForked;
-use Neos\EventSourcedContentRepository\Domain\Context\ContentStream\Event\ContentStreamWasRemoved;
-use Neos\EventSourcedContentRepository\Domain\Context\DimensionSpace\Event\DimensionShineThroughWasAdded;
-use Neos\EventSourcedContentRepository\Domain\Context\DimensionSpace\Event\DimensionSpacePointWasMoved;
-use Neos\EventSourcedContentRepository\Domain\Context\NodeAggregate\Event;
-use Neos\EventSourcedContentRepository\Domain\Context\NodeAggregate\Event\NodeAggregateTypeWasChanged;
-use Neos\EventSourcedContentRepository\Domain\Context\NodeAggregate\Event\NodeAggregateWasEnabled;
-use Neos\EventSourcedContentRepository\Domain\Context\NodeAggregate\Event\NodePropertiesWereSet;
-use Neos\EventSourcedContentRepository\Domain\Context\NodeAggregate\Event\NodeReferencesWereSet;
-use Neos\EventSourcedContentRepository\Domain\Context\NodeAggregate\Event\RootNodeAggregateWithNodeWasCreated;
-use Neos\EventSourcedContentRepository\Domain\Context\NodeAggregate\NodeAggregateClassification;
-use Neos\EventSourcedContentRepository\Domain\Context\NodeAggregate\OriginDimensionSpacePoint;
-use Neos\EventSourcedContentRepository\Domain\ValueObject\SerializedPropertyValues;
-use Neos\EventSourcedContentRepository\Infrastructure\Projection\AbstractProcessedEventsAwareProjector;
-use Neos\EventSourcedContentRepository\Service\Infrastructure\Service\DbalClient;
+use Neos\ContentRepository\Feature\NodeCreation\Event\NodeAggregateWithNodeWasCreated;
+use Neos\ContentRepository\Feature\NodeRenaming\Event\NodeAggregateNameWasChanged;
+use Neos\ContentRepository\Infrastructure\DbalClientInterface;
+use Neos\ContentRepository\SharedModel\Workspace\ContentStreamIdentifier;
+use Neos\ContentRepository\SharedModel\Node\NodeAggregateIdentifier;
+use Neos\ContentRepository\SharedModel\Node\NodeName;
+use Neos\ContentRepository\SharedModel\NodeType\NodeTypeName;
+use Neos\ContentRepository\Feature\ContentStreamForking\Event\ContentStreamWasForked;
+use Neos\ContentRepository\Feature\ContentStreamRemoval\Event\ContentStreamWasRemoved;
+use Neos\ContentRepository\Feature\DimensionSpaceAdjustment\Event\DimensionShineThroughWasAdded;
+use Neos\ContentRepository\Feature\DimensionSpaceAdjustment\Event\DimensionSpacePointWasMoved;
+use Neos\ContentRepository\Feature\NodeTypeChange\Event\NodeAggregateTypeWasChanged;
+use Neos\ContentRepository\Feature\NodeDisabling\Event\NodeAggregateWasEnabled;
+use Neos\ContentRepository\Feature\NodeModification\Event\NodePropertiesWereSet;
+use Neos\ContentRepository\Feature\NodeReferencing\Event\NodeReferencesWereSet;
+use Neos\ContentRepository\Feature\RootNodeCreation\Event\RootNodeAggregateWithNodeWasCreated;
+use Neos\ContentRepository\SharedModel\Node\NodeAggregateClassification;
+use Neos\ContentRepository\SharedModel\Node\OriginDimensionSpacePoint;
+use Neos\ContentRepository\Feature\Common\SerializedPropertyValues;
+use Neos\ContentRepository\Infrastructure\Projection\AbstractProcessedEventsAwareProjector;
 use Neos\EventSourcing\Event\DomainEventInterface;
 use Neos\EventSourcing\EventListener\BeforeInvokeInterface;
 use Neos\EventSourcing\EventStore\EventEnvelope;
@@ -69,12 +70,12 @@ class GraphProjector extends AbstractProcessedEventsAwareProjector implements Be
 
     private ThrowableStorageInterface $throwableStorage;
 
-    private DbalClient $databaseClient;
+    private DbalClientInterface $databaseClient;
 
     private bool $doingFullReplayOfProjection = false;
 
     public function __construct(
-        DbalClient $eventStorageDatabaseClient,
+        DbalClientInterface $eventStorageDatabaseClient,
         VariableFrontend $processedEventsCache,
         ProjectionContentGraph $projectionContentGraph,
         ThrowableStorageInterface $throwableStorage
@@ -147,21 +148,21 @@ class GraphProjector extends AbstractProcessedEventsAwareProjector implements Be
         $dimensionSpacePoint = DimensionSpacePoint::fromArray([]);
         $node = new NodeRecord(
             $nodeRelationAnchorPoint,
-            $event->getNodeAggregateIdentifier(),
+            $event->nodeAggregateIdentifier,
             $dimensionSpacePoint->coordinates,
             $dimensionSpacePoint->hash,
             SerializedPropertyValues::fromArray([]),
-            $event->getNodeTypeName(),
-            $event->getNodeAggregateClassification()
+            $event->nodeTypeName,
+            $event->nodeAggregateClassification
         );
 
         $this->transactional(function () use ($node, $event) {
             $node->addToDatabase($this->getDatabaseConnection());
             $this->connectHierarchy(
-                $event->getContentStreamIdentifier(),
+                $event->contentStreamIdentifier,
                 NodeRelationAnchorPoint::forRootEdge(),
                 $node->relationAnchorPoint,
-                $event->getCoveredDimensionSpacePoints(),
+                $event->coveredDimensionSpacePoints,
                 null
             );
         });
@@ -170,27 +171,27 @@ class GraphProjector extends AbstractProcessedEventsAwareProjector implements Be
     /**
      * @throws \Throwable
      */
-    final public function whenNodeAggregateWithNodeWasCreated(Event\NodeAggregateWithNodeWasCreated $event): void
+    final public function whenNodeAggregateWithNodeWasCreated(NodeAggregateWithNodeWasCreated $event): void
     {
         $this->transactional(function () use ($event) {
             $this->createNodeWithHierarchy(
-                $event->getContentStreamIdentifier(),
-                $event->getNodeAggregateIdentifier(),
-                $event->getNodeTypeName(),
-                $event->getParentNodeAggregateIdentifier(),
-                $event->getOriginDimensionSpacePoint(),
-                $event->getCoveredDimensionSpacePoints(),
-                $event->getInitialPropertyValues(),
-                $event->getNodeAggregateClassification(),
-                $event->getSucceedingNodeAggregateIdentifier(),
-                $event->getNodeName()
+                $event->contentStreamIdentifier,
+                $event->nodeAggregateIdentifier,
+                $event->nodeTypeName,
+                $event->parentNodeAggregateIdentifier,
+                $event->originDimensionSpacePoint,
+                $event->coveredDimensionSpacePoints,
+                $event->initialPropertyValues,
+                $event->nodeAggregateClassification,
+                $event->succeedingNodeAggregateIdentifier,
+                $event->nodeName
             );
 
             $this->connectRestrictionRelationsFromParentNodeToNewlyCreatedNode(
-                $event->getContentStreamIdentifier(),
-                $event->getParentNodeAggregateIdentifier(),
-                $event->getNodeAggregateIdentifier(),
-                $event->getCoveredDimensionSpacePoints()
+                $event->contentStreamIdentifier,
+                $event->parentNodeAggregateIdentifier,
+                $event->nodeAggregateIdentifier,
+                $event->coveredDimensionSpacePoints
             );
         });
     }
@@ -198,7 +199,7 @@ class GraphProjector extends AbstractProcessedEventsAwareProjector implements Be
     /**
      * @throws \Throwable
      */
-    final public function whenNodeAggregateNameWasChanged(Event\NodeAggregateNameWasChanged $event): void
+    final public function whenNodeAggregateNameWasChanged(NodeAggregateNameWasChanged $event): void
     {
         $this->transactional(function () use ($event) {
             $this->getDatabaseConnection()->executeUpdate('
