@@ -714,13 +714,11 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
 
     private function whenWorkspaceRebaseFailed(WorkspaceRebaseFailed $event): void
     {
-        // legacy handling: todo
+        // legacy handling:
         // before https://github.com/neos/neos-development-collection/pull/4965 this event was emitted and set the content stream status to `REBASE_ERROR`
-        // instead of setting the error state on replay for old events we make it behave like if the rebase had failed today:
-        // 4.E) In case of a [rebase error}, reopen the old content stream and remove the newly created
-        // The ContentStreamWasReopened event would be emitted with `IN_USE_BY_WORKSPACE` (because that _must_ be the previous state as a workspace was rebased)
+        // instead of setting the error state on replay for old events we make it almost behave like if the rebase had failed today: reopen the workspaces content stream id
+        // the candidateContentStreamId will be removed by the ContentStreamPruner
         $this->whenContentStreamWasReopened(new ContentStreamWasReopened($event->sourceContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE));
-        $this->whenContentStreamWasRemoved(new ContentStreamWasRemoved($event->candidateContentStreamId));
     }
 
     private function whenWorkspaceWasCreated(WorkspaceWasCreated $event): void
