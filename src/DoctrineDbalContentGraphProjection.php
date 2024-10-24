@@ -110,27 +110,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
     {
         $statements = $this->determineRequiredSqlStatements();
 
-        // MIGRATION from 2024-05-25: copy data from "cr_<crid>_p_workspace"/"cr_<crid>_p_contentstream" to "cr_<crid>_p_graph_workspace"/"cr_<crid>_p_graph_contentstream" tables
-        $legacyWorkspaceTableName = str_replace('_p_graph_workspace', '_p_workspace', $this->tableNames->workspace());
-        if (
-            $this->dbal->getSchemaManager()->tablesExist([$legacyWorkspaceTableName])
-            && !$this->dbal->getSchemaManager()->tablesExist([$this->tableNames->workspace()])
-        ) {
-            // we ignore the legacy fields workspacetitle, workspacedescription and workspaceowner
-            $statements[] = 'INSERT INTO ' . $this->tableNames->workspace() . ' (name, baseWorkspaceName, currentContentStreamId, status) SELECT workspacename AS name, baseworkspacename, currentcontentstreamid, status FROM ' . $legacyWorkspaceTableName;
-        }
-        $legacyContentStreamTableName = str_replace('_p_graph_contentstream', '_p_contentstream', $this->tableNames->contentStream());
-        if (
-            $this->dbal->getSchemaManager()->tablesExist([$legacyContentStreamTableName])
-            && !$this->dbal->getSchemaManager()->tablesExist([$this->tableNames->contentStream()])
-        ) {
-            // special migration regarding content stream table:
-            // 1.) don't copy removed content streams as they would not be flagged but actually removed
-            // 2.) transform legacy `REBASE_ERROR` content streams into `NO_LONGER_IN_USE`, as they should be removed and wouldn't exist today as well. (We cannot reopen the content stream that was attempted to be rebased like we would today in the migration here, for that a replay must be executed see whenWorkspaceRebaseFailed)
-            $statements[] = 'INSERT INTO ' . $this->tableNames->contentStream() . ' (id, version, sourceContentStreamId, status) SELECT contentStreamId AS id, version, sourceContentStreamId, REPLACE(state, \'REBASE_ERROR\', \'NO_LONGER_IN_USE\') AS status FROM ' . $legacyContentStreamTableName . ' WHERE NOT removed = 1';
-        }
-        // /MIGRATION
-
         foreach ($statements as $statement) {
             try {
                 $this->dbal->executeStatement($statement);
@@ -308,7 +287,7 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
         // NOTE: as reference edges are attached to Relation Anchor Points (and they are lazily copy-on-written),
         // we do not need to copy reference edges here (but we need to do it during copy on write).
 
-        $this->createContentStream($event->newContentStreamId, ContentStreamStatus::FORKED, $event->sourceContentStreamId);
+        $this->createContentStream($event->newContentStreamId, ContentStreamStatus::FORKED, $event->sourceContentStreamId, $event->versionOfSourceContentStream);
     }
 
     private function whenContentStreamWasRemoved(ContentStreamWasRemoved $event): void
@@ -735,15 +714,13 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
 
     private function whenWorkspaceRebaseFailed(WorkspaceRebaseFailed $event): void
     {
-        // legacy handling:
+        // legacy handling: todo
         // before https://github.com/neos/neos-development-collection/pull/4965 this event was emitted and set the content stream status to `REBASE_ERROR`
         // instead of setting the error state on replay for old events we make it behave like if the rebase had failed today:
         // 4.E) In case of a [rebase error}, reopen the old content stream and remove the newly created
         // The ContentStreamWasReopened event would be emitted with `IN_USE_BY_WORKSPACE` (because that _must_ be the previous state as a workspace was rebased)
         $this->whenContentStreamWasReopened(new ContentStreamWasReopened($event->sourceContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE));
         $this->whenContentStreamWasRemoved(new ContentStreamWasRemoved($event->candidateContentStreamId));
-
-        $this->markWorkspaceAsOutdatedConflict($event->workspaceName);
     }
 
     private function whenWorkspaceWasCreated(WorkspaceWasCreated $event): void
@@ -757,8 +734,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
     private function whenWorkspaceWasDiscarded(WorkspaceWasDiscarded $event): void
     {
         $this->updateWorkspaceContentStreamId($event->workspaceName, $event->newContentStreamId);
-        $this->markWorkspaceAsOutdated($event->workspaceName);
-        $this->markDependentWorkspacesAsOutdated($event->workspaceName);
 
         // the new content stream is in use now
         $this->updateContentStreamStatus($event->newContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE);
@@ -769,7 +744,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
     private function whenWorkspaceWasPartiallyDiscarded(WorkspaceWasPartiallyDiscarded $event): void
     {
         $this->updateWorkspaceContentStreamId($event->workspaceName, $event->newContentStreamId);
-        $this->markDependentWorkspacesAsOutdated($event->workspaceName);
 
         // the new content stream is in use now
         $this->updateContentStreamStatus($event->newContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE);
@@ -782,12 +756,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
     {
         // TODO: How do we test this method? – It's hard to design a BDD testcase that fails if this method is commented out...
         $this->updateWorkspaceContentStreamId($event->sourceWorkspaceName, $event->newSourceContentStreamId);
-        $this->markDependentWorkspacesAsOutdated($event->targetWorkspaceName);
-
-        // NASTY: we need to set the source workspace name as non-outdated; as it has been made up-to-date again.
-        $this->markWorkspaceAsUpToDate($event->sourceWorkspaceName);
-
-        $this->markDependentWorkspacesAsOutdated($event->sourceWorkspaceName);
 
         // the new content stream is in use now
         $this->updateContentStreamStatus($event->newSourceContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE);
@@ -800,12 +768,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
     {
         // TODO: How do we test this method? – It's hard to design a BDD testcase that fails if this method is commented out...
         $this->updateWorkspaceContentStreamId($event->sourceWorkspaceName, $event->newSourceContentStreamId);
-        $this->markDependentWorkspacesAsOutdated($event->targetWorkspaceName);
-
-        // NASTY: we need to set the source workspace name as non-outdated; as it has been made up-to-date again.
-        $this->markWorkspaceAsUpToDate($event->sourceWorkspaceName);
-
-        $this->markDependentWorkspacesAsOutdated($event->sourceWorkspaceName);
 
         // the new content stream is in use now
         $this->updateContentStreamStatus($event->newSourceContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE);
@@ -817,10 +779,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
     private function whenWorkspaceWasRebased(WorkspaceWasRebased $event): void
     {
         $this->updateWorkspaceContentStreamId($event->workspaceName, $event->newContentStreamId);
-        $this->markDependentWorkspacesAsOutdated($event->workspaceName);
-
-        // When the rebase is successful, we can set the status of the workspace back to UP_TO_DATE.
-        $this->markWorkspaceAsUpToDate($event->workspaceName);
 
         // the new content stream is in use now
         $this->updateContentStreamStatus($event->newContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE);
