@@ -761,7 +761,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
 
     private function whenWorkspaceWasPartiallyPublished(WorkspaceWasPartiallyPublished $event): void
     {
-        // TODO: How do we test this method? – It's hard to design a BDD testcase that fails if this method is commented out...
         $this->updateWorkspaceContentStreamId($event->sourceWorkspaceName, $event->newSourceContentStreamId);
 
         // the new content stream is in use now
@@ -773,7 +772,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
 
     private function whenWorkspaceWasPublished(WorkspaceWasPublished $event): void
     {
-        // TODO: How do we test this method? – It's hard to design a BDD testcase that fails if this method is commented out...
         $this->updateWorkspaceContentStreamId($event->sourceWorkspaceName, $event->newSourceContentStreamId);
 
         // the new content stream is in use now
