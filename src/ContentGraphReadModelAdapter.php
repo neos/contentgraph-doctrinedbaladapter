@@ -26,7 +26,6 @@ use Neos\ContentRepository\Core\SharedModel\Exception\WorkspaceDoesNotExist;
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStream;
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamId;
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreams;
-use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamStatus;
 use Neos\ContentRepository\Core\SharedModel\Workspace\Workspace;
 use Neos\ContentRepository\Core\SharedModel\Workspace\WorkspaceName;
 use Neos\ContentRepository\Core\SharedModel\Workspace\Workspaces;
@@ -104,7 +103,7 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
     {
         $contentStreamByIdStatement = <<<SQL
             SELECT
-                id, sourceContentStreamId, status, version
+                id, sourceContentStreamId, version, closed
             FROM
                 {$this->tableNames->contentStream()}
             WHERE
@@ -128,7 +127,7 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
     {
         $contentStreamsStatement = <<<SQL
             SELECT
-                id, sourceContentStreamId, status, version
+                id, sourceContentStreamId, version, closed
             FROM
                 {$this->tableNames->contentStream()}
         SQL;
@@ -193,11 +192,11 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
      */
     private static function contentStreamFromDatabaseRow(array $row): ContentStream
     {
-        return new ContentStream(
+        return ContentStream::create(
             ContentStreamId::fromString($row['id']),
             isset($row['sourceContentStreamId']) ? ContentStreamId::fromString($row['sourceContentStreamId']) : null,
-            ContentStreamStatus::from($row['status']),
-            Version::fromInteger((int)$row['version'])
+            Version::fromInteger((int)$row['version']),
+            (bool)$row['closed'],
         );
     }
 }
