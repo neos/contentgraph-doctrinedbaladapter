@@ -55,6 +55,7 @@ use Neos\ContentRepository\Core\SharedModel\Workspace\WorkspaceName;
  *    - cn -> child node
  *    - h -> the hierarchy edge connecting parent and child
  *    - ph -> the hierarchy edge incoming to the parent (sometimes relevant)
+ *    - ch -> the hierarchy edge of the child (sometimes relevant)
  *    - dsp -> dimension space point, resolves hashes to full dimension coordinates
  *    - cdsp -> child dimension space point, same as dsp for child queries
  *    - pdsp -> parent dimension space point, same as dsp for parent queries
@@ -199,11 +200,11 @@ final class ContentGraph implements ContentGraphInterface
             ->andWhere('c.nodeaggregateid = :entryNodeAggregateId');
 
         $queryBuilderRecursive = $this->createQueryBuilder()
-            ->select('pn.nodeAggregateId, h.parentnodeanchor')
-            ->from('ancestry', 'cn')
-            ->innerJoin('cn', $this->nodeQueryBuilder->tableNames->node(), 'pn', 'pn.relationanchorpoint = cn.parentnodeanchor')
-            ->innerJoin('pn', $this->nodeQueryBuilder->tableNames->hierarchyRelation(), 'h', 'h.childnodeanchor = pn.relationanchorpoint')
-            ->where('h.contentstreamid = :contentStreamId');
+            ->select('pn.nodeAggregateId, ph.parentnodeanchor')
+            ->from('ancestry', 'ch')
+            ->innerJoin('ch', $this->nodeQueryBuilder->tableNames->node(), 'pn', 'pn.relationanchorpoint = ch.parentnodeanchor')
+            ->innerJoin('pn', $this->nodeQueryBuilder->tableNames->hierarchyRelation(), 'ph', 'ph.childnodeanchor = pn.relationanchorpoint')
+            ->where('ph.contentstreamid = :contentStreamId');
 
         $queryBuilderCte = $this->createQueryBuilder()
             ->select('pn.nodeAggregateId')

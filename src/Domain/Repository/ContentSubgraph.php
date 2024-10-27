@@ -74,6 +74,7 @@ use Neos\ContentRepository\Core\SharedModel\Workspace\WorkspaceName;
  *   - cn -> child node
  *   - h -> the hierarchy edge connecting parent and child
  *   - ph -> the hierarchy edge incoming to the parent (sometimes relevant)
+ *   - ch -> the hierarchy edge of the child (sometimes relevant)
  *
  *  - if more than one node (source-destination)
  *   - sn -> source node
@@ -570,8 +571,8 @@ final class ContentSubgraph implements ContentSubgraphInterface
 
         $queryBuilderRecursive = $this->createQueryBuilder()
             ->select('pn.*, h.subtreetags, h.parentnodeanchor')
-            ->from('ancestry', 'cn')
-            ->innerJoin('cn', $this->nodeQueryBuilder->tableNames->node(), 'pn', 'pn.relationanchorpoint = cn.parentnodeanchor')
+            ->from('ancestry', 'ch')
+            ->innerJoin('ch', $this->nodeQueryBuilder->tableNames->node(), 'pn', 'pn.relationanchorpoint = ch.parentnodeanchor')
             ->innerJoin('pn', $this->nodeQueryBuilder->tableNames->hierarchyRelation(), 'h', 'h.childnodeanchor = pn.relationanchorpoint')
             ->where('h.contentstreamid = :contentStreamId')
             ->andWhere('h.dimensionspacepointhash = :dimensionSpacePointHash');
