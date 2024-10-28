@@ -159,7 +159,7 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
         $queryBuilder = $this->dbal->createQueryBuilder();
 
         return $queryBuilder
-            ->select('ws.name, ws.baseWorkspaceName, ws.currentContentStreamId, cs.sourceContentStreamVersion != scs.version as baseWorkspaceChanged')
+            ->select('ws.name, ws.baseWorkspaceName, ws.currentContentStreamId, cs.sourceContentStreamVersion = scs.version as upToDateWithBase')
             ->from($this->tableNames->workspace(), 'ws')
             ->join('ws', $this->tableNames->contentStream(), 'cs', 'cs.id = ws.currentcontentstreamid')
             ->leftJoin('cs', $this->tableNames->contentStream(), 'scs', 'scs.id = cs.sourceContentStreamId');
@@ -171,13 +171,17 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
     private static function workspaceFromDatabaseRow(array $row): Workspace
     {
         $baseWorkspaceName = $row['baseWorkspaceName'] !== null ? WorkspaceName::fromString($row['baseWorkspaceName']) : null;
-        $status = match ($row['baseWorkspaceChanged']) {
+
+        if ($baseWorkspaceName === null) {
             // no base workspace, a root is always up-to-date
-            null => WorkspaceStatus::UP_TO_DATE,
-            // base workspace didnt change (sql 0 is _false_)
-            0 => WorkspaceStatus::UP_TO_DATE,
-            default => WorkspaceStatus::OUTDATED,
-        };
+            $status = WorkspaceStatus::UP_TO_DATE;
+        } elseif ($row['upToDateWithBase'] === 1) {
+            // base workspace didnt change
+            $status = WorkspaceStatus::UP_TO_DATE;
+        } else {
+            // base content stream was removed or contains newer changes
+            $status = WorkspaceStatus::OUTDATED;
+        }
 
         return new Workspace(
             WorkspaceName::fromString($row['name']),
