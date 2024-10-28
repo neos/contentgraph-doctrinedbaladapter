@@ -72,11 +72,6 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
         return new ContentGraph($this->dbal, $this->nodeFactory, $this->contentRepositoryId, $this->nodeTypeManager, $this->tableNames, $workspaceName, $currentContentStreamId);
     }
 
-    public function buildContentGraph(WorkspaceName $workspaceName, ContentStreamId $contentStreamId): ContentGraph
-    {
-        return new ContentGraph($this->dbal, $this->nodeFactory, $this->contentRepositoryId, $this->nodeTypeManager, $this->tableNames, $workspaceName, $contentStreamId);
-    }
-
     public function findWorkspaceByName(WorkspaceName $workspaceName): ?Workspace
     {
         $workspaceQuery = $this->getBasicWorkspaceQuery()
