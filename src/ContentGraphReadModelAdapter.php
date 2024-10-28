@@ -183,7 +183,7 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
             $status = WorkspaceStatus::OUTDATED;
         }
 
-        return new Workspace(
+        return Workspace::create(
             WorkspaceName::fromString($row['name']),
             $baseWorkspaceName,
             ContentStreamId::fromString($row['currentContentStreamId']),
