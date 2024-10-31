@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Neos\ContentGraph\DoctrineDbalAdapter\Domain\Projection\Feature;
 
-use Neos\ContentRepository\Core\EventStore\EventInterface;
-use Neos\ContentRepository\Core\Feature\Common\EmbedsContentStreamId;
-use Neos\ContentRepository\Core\Feature\Common\PublishableToWorkspaceInterface;
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamId;
 use Neos\EventStore\Model\Event\Version;
 
@@ -54,18 +51,16 @@ trait ContentStream
         ]);
     }
 
-    private function updateContentStreamVersion(EventInterface&EmbedsContentStreamId $event, Version $version): void
+    private function updateContentStreamVersion(ContentStreamId $contentStreamId, Version $version, bool $markAsDirty): void
     {
-        // todo make fork content stream `EmbedsContentStreamId` but then just ignore it here because we set the version already
-        $isPublishableEvent = $event instanceof PublishableToWorkspaceInterface;
         $updatePayload = [
             'version' => $version->value,
         ];
-        if ($isPublishableEvent) {
+        if ($markAsDirty) {
             $updatePayload['dirty'] = 1;
         }
         $this->dbal->update($this->tableNames->contentStream(), $updatePayload, [
-            'id' => $event->getContentStreamId()->value,
+            'id' => $contentStreamId->value,
         ]);
     }
 }
