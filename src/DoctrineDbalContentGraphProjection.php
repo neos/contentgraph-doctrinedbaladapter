@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Neos\ContentGraph\DoctrineDbalAdapter;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception as DBALException;
 use Neos\ContentGraph\DoctrineDbalAdapter\Domain\Projection\Feature\ContentStream;
@@ -71,6 +72,7 @@ use Neos\ContentRepository\Core\Projection\ProjectionStatus;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateClassification;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateId;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeName;
+use Neos\ContentRepository\Core\SharedModel\Node\ReferenceName;
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamId;
 use Neos\EventStore\Model\Event\SequenceNumber;
 use Neos\EventStore\Model\EventEnvelope;
@@ -597,16 +599,26 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
                     $event->contentStreamId
                 );
 
+
             // remove old
-            foreach ($event->references->getReferenceNames() as $referenceName) {
-                try {
-                    $this->dbal->delete($this->tableNames->referenceRelation(), [
+            $deleteOldReferencesSql = <<<SQL
+            DELETE FROM {$this->tableNames->referenceRelation()}
+                WHERE nodeanchorpoint = :nodeanchorpoint
+                AND name in (:names)
+            SQL;
+            try {
+                $this->dbal->executeStatement(
+                    $deleteOldReferencesSql,
+                    [
                         'nodeanchorpoint' => $nodeAnchorPoint?->value,
-                        'name' => $referenceName->value
-                    ]);
-                } catch (DbalException $e) {
-                    throw new \RuntimeException(sprintf('Failed to remove reference relation: %s', $e->getMessage()), 1716486309, $e);
-                }
+                        'names' => array_map(fn (ReferenceName $name) => $name->value, $event->references->getReferenceNames())
+                    ],
+                    [
+                        'names' => ArrayParameterType::STRING
+                    ]
+                );
+            } catch (DbalException $e) {
+                throw new \RuntimeException(sprintf('Failed to remove reference relation: %s', $e->getMessage()), 1716486309, $e);
             }
 
             // set new
