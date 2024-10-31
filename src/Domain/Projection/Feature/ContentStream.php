@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Neos\ContentGraph\DoctrineDbalAdapter\Domain\Projection\Feature;
 
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamId;
-use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamStatus;
 use Neos\EventStore\Model\Event\Version;
 
 /**
@@ -15,21 +14,29 @@ use Neos\EventStore\Model\Event\Version;
  */
 trait ContentStream
 {
-    private function createContentStream(ContentStreamId $contentStreamId, ContentStreamStatus $status, ?ContentStreamId $sourceContentStreamId = null, ?Version $sourceVersion = null): void
+    private function createContentStream(ContentStreamId $contentStreamId, ?ContentStreamId $sourceContentStreamId = null, ?Version $sourceVersion = null): void
     {
         $this->dbal->insert($this->tableNames->contentStream(), [
             'id' => $contentStreamId->value,
             'version' => 0,
             'sourceContentStreamId' => $sourceContentStreamId?->value,
-            'sourceContentStreamVersion' => $sourceVersion?->value,
-            'status' => $status->value,
+            'sourceContentStreamVersion' => $sourceVersion?->value
         ]);
     }
 
-    private function updateContentStreamStatus(ContentStreamId $contentStreamId, ContentStreamStatus $status): void
+    private function closeContentStream(ContentStreamId $contentStreamId): void
     {
         $this->dbal->update($this->tableNames->contentStream(), [
-            'status' => $status->value,
+            'closed' => 1,
+        ], [
+            'id' => $contentStreamId->value
+        ]);
+    }
+
+    private function reopenContentStream(ContentStreamId $contentStreamId): void
+    {
+        $this->dbal->update($this->tableNames->contentStream(), [
+            'closed' => 0,
         ], [
             'id' => $contentStreamId->value
         ]);
@@ -37,9 +44,7 @@ trait ContentStream
 
     private function removeContentStream(ContentStreamId $contentStreamId): void
     {
-        $this->dbal->update($this->tableNames->contentStream(), [
-            'removed' => true,
-        ], [
+        $this->dbal->delete($this->tableNames->contentStream(), [
             'id' => $contentStreamId->value
         ]);
     }
