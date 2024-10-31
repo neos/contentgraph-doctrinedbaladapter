@@ -237,7 +237,7 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
             default => $event instanceof EmbedsContentStreamId || throw new \InvalidArgumentException(sprintf('Unsupported event %s', get_debug_type($event))),
         };
         if ($event instanceof EmbedsContentStreamId && ContentStreamEventStreamName::isContentStreamStreamName($eventEnvelope->streamName)) {
-            $this->updateContentStreamVersion($event->getContentStreamId(), $eventEnvelope->version);
+            $this->updateContentStreamVersion($event, $eventEnvelope->version);
         }
     }
 
