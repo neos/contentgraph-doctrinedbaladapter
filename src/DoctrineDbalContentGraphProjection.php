@@ -17,12 +17,11 @@ use Neos\ContentGraph\DoctrineDbalAdapter\Domain\Projection\NodeRecord;
 use Neos\ContentGraph\DoctrineDbalAdapter\Domain\Projection\NodeRelationAnchorPoint;
 use Neos\ContentGraph\DoctrineDbalAdapter\Domain\Repository\DimensionSpacePointsRepository;
 use Neos\ContentGraph\DoctrineDbalAdapter\Domain\Repository\ProjectionContentGraph;
-use Neos\ContentRepository\Core\EventStore\InitiatingEventMetadata;
-use Neos\ContentRepository\Core\Projection\ContentGraph\ContentGraphReadModelInterface;
 use Neos\ContentRepository\Core\DimensionSpace\DimensionSpacePoint;
 use Neos\ContentRepository\Core\DimensionSpace\DimensionSpacePointSet;
 use Neos\ContentRepository\Core\DimensionSpace\OriginDimensionSpacePoint;
 use Neos\ContentRepository\Core\EventStore\EventInterface;
+use Neos\ContentRepository\Core\EventStore\InitiatingEventMetadata;
 use Neos\ContentRepository\Core\Feature\Common\EmbedsContentStreamId;
 use Neos\ContentRepository\Core\Feature\Common\InterdimensionalSiblings;
 use Neos\ContentRepository\Core\Feature\ContentStreamClosing\Event\ContentStreamWasClosed;
@@ -64,15 +63,15 @@ use Neos\ContentRepository\Core\Infrastructure\DbalCheckpointStorage;
 use Neos\ContentRepository\Core\Infrastructure\DbalSchemaDiff;
 use Neos\ContentRepository\Core\NodeType\NodeTypeName;
 use Neos\ContentRepository\Core\Projection\CheckpointStorageStatusType;
+use Neos\ContentRepository\Core\Projection\ContentGraph\ContentGraphProjectionInterface;
+use Neos\ContentRepository\Core\Projection\ContentGraph\ContentGraphReadModelInterface;
 use Neos\ContentRepository\Core\Projection\ContentGraph\NodeTags;
 use Neos\ContentRepository\Core\Projection\ContentGraph\Timestamps;
 use Neos\ContentRepository\Core\Projection\ProjectionStatus;
-use Neos\ContentRepository\Core\Projection\ContentGraph\ContentGraphProjectionInterface;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateClassification;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateId;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeName;
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamId;
-use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamStatus;
 use Neos\EventStore\Model\Event\SequenceNumber;
 use Neos\EventStore\Model\EventEnvelope;
 
@@ -259,12 +258,12 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
 
     private function whenContentStreamWasClosed(ContentStreamWasClosed $event): void
     {
-        $this->updateContentStreamStatus($event->contentStreamId, ContentStreamStatus::CLOSED);
+        $this->closeContentStream($event->contentStreamId);
     }
 
     private function whenContentStreamWasCreated(ContentStreamWasCreated $event): void
     {
-        $this->createContentStream($event->contentStreamId, ContentStreamStatus::CREATED);
+        $this->createContentStream($event->contentStreamId);
     }
 
     private function whenContentStreamWasForked(ContentStreamWasForked $event): void
@@ -303,7 +302,7 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
         // NOTE: as reference edges are attached to Relation Anchor Points (and they are lazily copy-on-written),
         // we do not need to copy reference edges here (but we need to do it during copy on write).
 
-        $this->createContentStream($event->newContentStreamId, ContentStreamStatus::FORKED, $event->sourceContentStreamId, $event->versionOfSourceContentStream);
+        $this->createContentStream($event->newContentStreamId, $event->sourceContentStreamId, $event->versionOfSourceContentStream);
     }
 
     private function whenContentStreamWasRemoved(ContentStreamWasRemoved $event): void
@@ -353,7 +352,7 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
 
     private function whenContentStreamWasReopened(ContentStreamWasReopened $event): void
     {
-        $this->updateContentStreamStatus($event->contentStreamId, $event->previousState);
+        $this->reopenContentStream($event->contentStreamId);
     }
 
     private function whenDimensionShineThroughWasAdded(DimensionShineThroughWasAdded $event): void
@@ -708,9 +707,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
     private function whenRootWorkspaceWasCreated(RootWorkspaceWasCreated $event): void
     {
         $this->createWorkspace($event->workspaceName, null, $event->newContentStreamId);
-
-        // the content stream is in use now
-        $this->updateContentStreamStatus($event->newContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE);
     }
 
     private function whenSubtreeWasTagged(SubtreeWasTagged $event): void
@@ -730,69 +726,41 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
 
     private function whenWorkspaceRebaseFailed(WorkspaceRebaseFailed $event): void
     {
-        $this->updateContentStreamStatus($event->candidateContentStreamId, ContentStreamStatus::REBASE_ERROR);
+        // legacy handling:
+        // before https://github.com/neos/neos-development-collection/pull/4965 this event was emitted and set the content stream status to `REBASE_ERROR`
+        // instead of setting the error state on replay for old events we make it almost behave like if the rebase had failed today: reopen the workspaces content stream id
+        // the candidateContentStreamId will be removed by the ContentStreamPruner
+        $this->reopenContentStream($event->sourceContentStreamId);
     }
 
     private function whenWorkspaceWasCreated(WorkspaceWasCreated $event): void
     {
         $this->createWorkspace($event->workspaceName, $event->baseWorkspaceName, $event->newContentStreamId);
-
-        // the content stream is in use now
-        $this->updateContentStreamStatus($event->newContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE);
     }
 
     private function whenWorkspaceWasDiscarded(WorkspaceWasDiscarded $event): void
     {
         $this->updateWorkspaceContentStreamId($event->workspaceName, $event->newContentStreamId);
-
-        // the new content stream is in use now
-        $this->updateContentStreamStatus($event->newContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE);
-        // the previous content stream is no longer in use
-        $this->updateContentStreamStatus($event->previousContentStreamId, ContentStreamStatus::NO_LONGER_IN_USE);
     }
 
     private function whenWorkspaceWasPartiallyDiscarded(WorkspaceWasPartiallyDiscarded $event): void
     {
         $this->updateWorkspaceContentStreamId($event->workspaceName, $event->newContentStreamId);
-
-        // the new content stream is in use now
-        $this->updateContentStreamStatus($event->newContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE);
-
-        // the previous content stream is no longer in use
-        $this->updateContentStreamStatus($event->previousContentStreamId, ContentStreamStatus::NO_LONGER_IN_USE);
     }
 
     private function whenWorkspaceWasPartiallyPublished(WorkspaceWasPartiallyPublished $event): void
     {
         $this->updateWorkspaceContentStreamId($event->sourceWorkspaceName, $event->newSourceContentStreamId);
-
-        // the new content stream is in use now
-        $this->updateContentStreamStatus($event->newSourceContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE);
-
-        // the previous content stream is no longer in use
-        $this->updateContentStreamStatus($event->previousSourceContentStreamId, ContentStreamStatus::NO_LONGER_IN_USE);
     }
 
     private function whenWorkspaceWasPublished(WorkspaceWasPublished $event): void
     {
         $this->updateWorkspaceContentStreamId($event->sourceWorkspaceName, $event->newSourceContentStreamId);
-
-        // the new content stream is in use now
-        $this->updateContentStreamStatus($event->newSourceContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE);
-
-        // the previous content stream is no longer in use
-        $this->updateContentStreamStatus($event->previousSourceContentStreamId, ContentStreamStatus::NO_LONGER_IN_USE);
     }
 
     private function whenWorkspaceWasRebased(WorkspaceWasRebased $event): void
     {
         $this->updateWorkspaceContentStreamId($event->workspaceName, $event->newContentStreamId);
-
-        // the new content stream is in use now
-        $this->updateContentStreamStatus($event->newContentStreamId, ContentStreamStatus::IN_USE_BY_WORKSPACE);
-
-        // the previous content stream is no longer in use
-        $this->updateContentStreamStatus($event->previousContentStreamId, ContentStreamStatus::NO_LONGER_IN_USE);
     }
 
     private function whenWorkspaceWasRemoved(WorkspaceWasRemoved $event): void
