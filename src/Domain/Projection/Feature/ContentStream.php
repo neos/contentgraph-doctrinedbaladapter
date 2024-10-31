@@ -24,7 +24,8 @@ trait ContentStream
             'version' => 0,
             'sourceContentStreamId' => $sourceContentStreamId?->value,
             'sourceContentStreamVersion' => $sourceVersion?->value,
-            'publishableEvents' => 0
+            'closed' => 0,
+            'dirty' => 0
         ]);
     }
 
@@ -57,20 +58,14 @@ trait ContentStream
     {
         // todo make fork content stream `EmbedsContentStreamId` but then just ignore it here because we set the version already
         $isPublishableEvent = $event instanceof PublishableToWorkspaceInterface;
+        $updatePayload = [
+            'version' => $version->value,
+        ];
         if ($isPublishableEvent) {
-            $this->dbal->executeStatement(
-                "UPDATE {$this->tableNames->contentStream()} SET version=:version, publishableEvents=publishableEvents+1 WHERE id=:id",
-                [
-                    'version' => $version->value,
-                    'id' => $event->getContentStreamId()->value,
-                ]
-            );
-        } else {
-            $this->dbal->update($this->tableNames->contentStream(), [
-                'version' => $version->value,
-            ], [
-                'id' => $event->getContentStreamId()->value,
-            ]);
+            $updatePayload['dirty'] = 1;
         }
+        $this->dbal->update($this->tableNames->contentStream(), $updatePayload, [
+            'id' => $event->getContentStreamId()->value,
+        ]);
     }
 }

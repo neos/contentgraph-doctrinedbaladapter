@@ -159,7 +159,7 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
         $queryBuilder = $this->dbal->createQueryBuilder();
 
         return $queryBuilder
-            ->select('ws.name, ws.baseWorkspaceName, ws.currentContentStreamId, cs.sourceContentStreamVersion = scs.version as upToDateWithBase, cs.publishableEvents as publishableEventsOnStream')
+            ->select('ws.name, ws.baseWorkspaceName, ws.currentContentStreamId, cs.sourceContentStreamVersion = scs.version as upToDateWithBase, cs.dirty as workspaceHasChanges')
             ->from($this->tableNames->workspace(), 'ws')
             ->join('ws', $this->tableNames->contentStream(), 'cs', 'cs.id = ws.currentcontentstreamid')
             ->leftJoin('cs', $this->tableNames->contentStream(), 'scs', 'scs.id = cs.sourceContentStreamId');
@@ -188,7 +188,9 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
             $baseWorkspaceName,
             ContentStreamId::fromString($row['currentContentStreamId']),
             $status,
-            $baseWorkspaceName === null ? 0 : $row['publishableEventsOnStream'],
+            $baseWorkspaceName === null
+                ? false
+                : (bool)$row['workspaceHasChanges'],
         );
     }
 
