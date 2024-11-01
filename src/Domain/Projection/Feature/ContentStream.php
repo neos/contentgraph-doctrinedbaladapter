@@ -20,7 +20,9 @@ trait ContentStream
             'id' => $contentStreamId->value,
             'version' => 0,
             'sourceContentStreamId' => $sourceContentStreamId?->value,
-            'sourceContentStreamVersion' => $sourceVersion?->value
+            'sourceContentStreamVersion' => $sourceVersion?->value,
+            'closed' => 0,
+            'hasChanges' => 0
         ]);
     }
 
@@ -49,11 +51,15 @@ trait ContentStream
         ]);
     }
 
-    private function updateContentStreamVersion(ContentStreamId $contentStreamId, Version $version): void
+    private function updateContentStreamVersion(ContentStreamId $contentStreamId, Version $version, bool $markAsDirty): void
     {
-        $this->dbal->update($this->tableNames->contentStream(), [
+        $updatePayload = [
             'version' => $version->value,
-        ], [
+        ];
+        if ($markAsDirty) {
+            $updatePayload['hasChanges'] = 1;
+        }
+        $this->dbal->update($this->tableNames->contentStream(), $updatePayload, [
             'id' => $contentStreamId->value,
         ]);
     }

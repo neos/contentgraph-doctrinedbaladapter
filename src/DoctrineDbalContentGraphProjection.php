@@ -25,6 +25,7 @@ use Neos\ContentRepository\Core\EventStore\EventInterface;
 use Neos\ContentRepository\Core\EventStore\InitiatingEventMetadata;
 use Neos\ContentRepository\Core\Feature\Common\EmbedsContentStreamId;
 use Neos\ContentRepository\Core\Feature\Common\InterdimensionalSiblings;
+use Neos\ContentRepository\Core\Feature\Common\PublishableToWorkspaceInterface;
 use Neos\ContentRepository\Core\Feature\ContentStreamClosing\Event\ContentStreamWasClosed;
 use Neos\ContentRepository\Core\Feature\ContentStreamClosing\Event\ContentStreamWasReopened;
 use Neos\ContentRepository\Core\Feature\ContentStreamCreation\Event\ContentStreamWasCreated;
@@ -239,8 +240,16 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
             WorkspaceWasRemoved::class => $this->whenWorkspaceWasRemoved($event),
             default => $event instanceof EmbedsContentStreamId || throw new \InvalidArgumentException(sprintf('Unsupported event %s', get_debug_type($event))),
         };
-        if ($event instanceof EmbedsContentStreamId && ContentStreamEventStreamName::isContentStreamStreamName($eventEnvelope->streamName)) {
-            $this->updateContentStreamVersion($event->getContentStreamId(), $eventEnvelope->version);
+        if (
+            $event instanceof EmbedsContentStreamId
+            && ContentStreamEventStreamName::isContentStreamStreamName($eventEnvelope->streamName)
+            && !(
+                // special case as we dont need to update anything. The handling above takes care of setting the version to 0
+                $event instanceof ContentStreamWasForked
+                || $event instanceof ContentStreamWasCreated
+            )
+        ) {
+            $this->updateContentStreamVersion($event->getContentStreamId(), $eventEnvelope->version, $event instanceof PublishableToWorkspaceInterface);
         }
     }
 
