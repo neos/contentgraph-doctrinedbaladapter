@@ -22,7 +22,7 @@ trait ContentStream
             'sourceContentStreamId' => $sourceContentStreamId?->value,
             'sourceContentStreamVersion' => $sourceVersion?->value,
             'closed' => 0,
-            'dirty' => 0
+            'hasChanges' => 0
         ]);
     }
 
@@ -57,7 +57,7 @@ trait ContentStream
             'version' => $version->value,
         ];
         if ($markAsDirty) {
-            $updatePayload['dirty'] = 1;
+            $updatePayload['hasChanges'] = 1;
         }
         $this->dbal->update($this->tableNames->contentStream(), $updatePayload, [
             'id' => $contentStreamId->value,

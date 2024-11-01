@@ -130,7 +130,7 @@ class DoctrineDbalContentGraphSchemaBuilder
             DbalSchemaFactory::columnForContentStreamId('sourceContentStreamId')->setNotnull(false),
             (new Column('sourceContentStreamVersion', Type::getType(Types::INTEGER)))->setNotnull(false),
             (new Column('closed', Type::getType(Types::BOOLEAN)))->setNotnull(true),
-            (new Column('dirty', Type::getType(Types::BOOLEAN)))->setNotnull(true),
+            (new Column('hasChanges', Type::getType(Types::BOOLEAN)))->setNotnull(true),
         ]);
 
         return $contentStreamTable->setPrimaryKey(['id']);
