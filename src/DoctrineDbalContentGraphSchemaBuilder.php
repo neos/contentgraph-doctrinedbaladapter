@@ -115,22 +115,25 @@ class DoctrineDbalContentGraphSchemaBuilder
             DbalSchemaFactory::columnForWorkspaceName('name')->setNotnull(true),
             DbalSchemaFactory::columnForWorkspaceName('baseWorkspaceName')->setNotnull(false),
             DbalSchemaFactory::columnForContentStreamId('currentContentStreamId')->setNotNull(true),
-            (new Column('status', self::type(Types::BINARY)))->setLength(20)->setNotnull(false),
         ]);
+
+        $workspaceTable->addUniqueIndex(['currentContentStreamId']);
 
         return $workspaceTable->setPrimaryKey(['name']);
     }
 
     private function createContentStreamTable(): Table
     {
-        return self::createTable($this->tableNames->contentStream(), [
+        $contentStreamTable = self::createTable($this->tableNames->contentStream(), [
             DbalSchemaFactory::columnForContentStreamId('id')->setNotnull(true),
             (new Column('version', Type::getType(Types::INTEGER)))->setNotnull(true),
             DbalSchemaFactory::columnForContentStreamId('sourceContentStreamId')->setNotnull(false),
-            // Should become a DB ENUM (unclear how to configure with DBAL) or int (latter needs adaption to code)
-            (new Column('status', Type::getType(Types::BINARY)))->setLength(20)->setNotnull(true),
-            (new Column('removed', Type::getType(Types::BOOLEAN)))->setDefault(false)->setNotnull(false)
+            (new Column('sourceContentStreamVersion', Type::getType(Types::INTEGER)))->setNotnull(false),
+            (new Column('closed', Type::getType(Types::BOOLEAN)))->setNotnull(true),
+            (new Column('hasChanges', Type::getType(Types::BOOLEAN)))->setNotnull(true),
         ]);
+
+        return $contentStreamTable->setPrimaryKey(['id']);
     }
 
     /**
