@@ -192,23 +192,22 @@ final class ContentGraph implements ContentGraphInterface
     public function findAncestorNodeAggregateIds(NodeAggregateId $entryNodeAggregateId): NodeAggregateIds
     {
         $queryBuilderInitial = $this->createQueryBuilder()
-            ->select('n.nodeAggregateId, ch.parentnodeanchor')
-            ->from($this->nodeQueryBuilder->tableNames->node(), 'n')
-            ->innerJoin('n', $this->nodeQueryBuilder->tableNames->hierarchyRelation(), 'ch', 'ch.parentnodeanchor = n.relationanchorpoint')
+            ->select('ch.parentnodeanchor')
+            ->from($this->nodeQueryBuilder->tableNames->hierarchyRelation(), 'ch')
             ->innerJoin('ch', $this->nodeQueryBuilder->tableNames->node(), 'c', 'c.relationanchorpoint = ch.childnodeanchor')
             ->where('ch.contentstreamid = :contentStreamId')
             ->andWhere('c.nodeaggregateid = :entryNodeAggregateId');
 
         $queryBuilderRecursive = $this->createQueryBuilder()
-            ->select('pn.nodeAggregateId, ph.parentnodeanchor')
+            ->select('ph.parentnodeanchor')
             ->from('ancestry', 'ch')
-            ->innerJoin('ch', $this->nodeQueryBuilder->tableNames->node(), 'pn', 'pn.relationanchorpoint = ch.parentnodeanchor')
-            ->innerJoin('pn', $this->nodeQueryBuilder->tableNames->hierarchyRelation(), 'ph', 'ph.childnodeanchor = pn.relationanchorpoint')
+            ->innerJoin('ch', $this->nodeQueryBuilder->tableNames->hierarchyRelation(), 'ph', 'ph.childnodeanchor = ch.parentnodeanchor')
             ->where('ph.contentstreamid = :contentStreamId');
 
         $queryBuilderCte = $this->createQueryBuilder()
-            ->select('pn.nodeAggregateId')
-            ->from('ancestry', 'pn')
+            ->select('n.nodeAggregateId')
+            ->from('ancestry', 'a')
+            ->innerJoin('a', $this->nodeQueryBuilder->tableNames->node(), 'n', 'n.relationanchorpoint = a.parentnodeanchor')
             ->setParameter('contentStreamId', $this->contentStreamId->value)
             ->setParameter('entryNodeAggregateId', $entryNodeAggregateId->value);
 
