@@ -26,7 +26,6 @@ use Neos\ContentRepository\Core\SharedModel\Exception\WorkspaceDoesNotExist;
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStream;
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamId;
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreams;
-use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamStatus;
 use Neos\ContentRepository\Core\SharedModel\Workspace\Workspace;
 use Neos\ContentRepository\Core\SharedModel\Workspace\WorkspaceName;
 use Neos\ContentRepository\Core\SharedModel\Workspace\Workspaces;
@@ -104,7 +103,7 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
     {
         $contentStreamByIdStatement = <<<SQL
             SELECT
-                id, sourceContentStreamId, status, version, removed
+                id, sourceContentStreamId, version, closed
             FROM
                 {$this->tableNames->contentStream()}
             WHERE
@@ -128,7 +127,7 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
     {
         $contentStreamsStatement = <<<SQL
             SELECT
-                id, sourceContentStreamId, status, version, removed
+                id, sourceContentStreamId, version, closed
             FROM
                 {$this->tableNames->contentStream()}
         SQL;
@@ -160,7 +159,7 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
         $queryBuilder = $this->dbal->createQueryBuilder();
 
         return $queryBuilder
-            ->select('ws.name, ws.baseWorkspaceName, ws.currentContentStreamId, cs.sourceContentStreamVersion != scs.version as baseWorkspaceChanged')
+            ->select('ws.name, ws.baseWorkspaceName, ws.currentContentStreamId, cs.hasChanges, cs.sourceContentStreamVersion = scs.version as upToDateWithBase')
             ->from($this->tableNames->workspace(), 'ws')
             ->join('ws', $this->tableNames->contentStream(), 'cs', 'cs.id = ws.currentcontentstreamid')
             ->leftJoin('cs', $this->tableNames->contentStream(), 'scs', 'scs.id = cs.sourceContentStreamId');
@@ -172,33 +171,39 @@ final readonly class ContentGraphReadModelAdapter implements ContentGraphReadMod
     private static function workspaceFromDatabaseRow(array $row): Workspace
     {
         $baseWorkspaceName = $row['baseWorkspaceName'] !== null ? WorkspaceName::fromString($row['baseWorkspaceName']) : null;
-        $status = match ($row['baseWorkspaceChanged']) {
-            // no base workspace, a root is always up-to-date
-            null => WorkspaceStatus::UP_TO_DATE,
-            // base workspace didnt change (sql 0 is _false_)
-            0 => WorkspaceStatus::UP_TO_DATE,
-            default => WorkspaceStatus::OUTDATED,
-        };
 
-        return new Workspace(
+        if ($baseWorkspaceName === null) {
+            // no base workspace, a root is always up-to-date
+            $status = WorkspaceStatus::UP_TO_DATE;
+        } elseif ($row['upToDateWithBase'] === 1) {
+            // base workspace didnt change
+            $status = WorkspaceStatus::UP_TO_DATE;
+        } else {
+            // base content stream was removed or contains newer changes
+            $status = WorkspaceStatus::OUTDATED;
+        }
+
+        return Workspace::create(
             WorkspaceName::fromString($row['name']),
             $baseWorkspaceName,
             ContentStreamId::fromString($row['currentContentStreamId']),
             $status,
+            $baseWorkspaceName === null
+                ? false
+                : (bool)$row['hasChanges'],
         );
     }
 
     /**
-     * @param array<string, mixed> $row todo fetch source content stream version and use for publishing as expected version
+     * @param array<string, mixed> $row
      */
     private static function contentStreamFromDatabaseRow(array $row): ContentStream
     {
-        return new ContentStream(
+        return ContentStream::create(
             ContentStreamId::fromString($row['id']),
             isset($row['sourceContentStreamId']) ? ContentStreamId::fromString($row['sourceContentStreamId']) : null,
-            ContentStreamStatus::from($row['status']),
             Version::fromInteger((int)$row['version']),
-            (bool)$row['removed']
+            (bool)$row['closed'],
         );
     }
 }
