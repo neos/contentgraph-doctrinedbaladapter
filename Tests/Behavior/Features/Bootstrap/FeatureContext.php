@@ -18,13 +18,13 @@ use Behat\Behat\Hook\Scope\BeforeScenarioScope;
 use Neos\Behat\FlowBootstrapTrait;
 use Neos\ContentGraph\DoctrineDbalAdapter\Tests\Behavior\Features\Bootstrap\ProjectionIntegrityViolationDetectionTrait;
 use Neos\ContentRepository\BehavioralTests\TestSuite\Behavior\CRBehavioralTestsSubjectProvider;
-use Neos\ContentRepository\BehavioralTests\TestSuite\Behavior\GherkinPyStringNodeBasedNodeTypeManagerFactory;
-use Neos\ContentRepository\BehavioralTests\TestSuite\Behavior\GherkinTableNodeBasedContentDimensionSourceFactory;
 use Neos\ContentRepository\Core\ContentRepository;
 use Neos\ContentRepository\Core\Factory\ContentRepositoryServiceFactoryInterface;
 use Neos\ContentRepository\Core\Factory\ContentRepositoryServiceInterface;
 use Neos\ContentRepository\Core\SharedModel\ContentRepository\ContentRepositoryId;
 use Neos\ContentRepository\TestSuite\Behavior\Features\Bootstrap\CRTestSuiteTrait;
+use Neos\ContentRepository\TestSuite\Fakes\GherkinPyStringNodeBasedNodeTypeManagerFactory;
+use Neos\ContentRepository\TestSuite\Fakes\GherkinTableNodeBasedContentDimensionSourceFactory;
 use Neos\ContentRepositoryRegistry\ContentRepositoryRegistry;
 
 /**
