@@ -305,7 +305,11 @@ final class ContentSubgraph implements ContentSubgraphInterface
                 $this->dimensionSpacePoint,
                 $this->visibilityConstraints
             );
-            $subtree = Subtree::create((int)$nodeData['level'], $node, Subtrees::fromArray(array_key_exists($nodeAggregateId, $subtreesByParentNodeId) ? array_reverse($subtreesByParentNodeId[$nodeAggregateId]) : []));
+            $subtree = Subtree::create(
+                (int)$nodeData['level'],
+                $node,
+                array_key_exists($nodeAggregateId, $subtreesByParentNodeId) ? Subtrees::fromArray(array_reverse($subtreesByParentNodeId[$nodeAggregateId])) : Subtrees::createEmpty()
+            );
             if ($subtree->level === 0) {
                 return $subtree;
             }
