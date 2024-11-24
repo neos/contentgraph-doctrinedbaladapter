@@ -67,7 +67,7 @@ use Neos\ContentRepository\Core\Projection\ContentGraph\ContentGraphProjectionIn
 use Neos\ContentRepository\Core\Projection\ContentGraph\ContentGraphReadModelInterface;
 use Neos\ContentRepository\Core\Projection\ContentGraph\NodeTags;
 use Neos\ContentRepository\Core\Projection\ContentGraph\Timestamps;
-use Neos\ContentRepository\Core\Projection\ProjectionStatus;
+use Neos\ContentRepository\Core\Projection\ProjectionSetupStatus;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateClassification;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateId;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeName;
@@ -112,23 +112,23 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
         }
     }
 
-    public function status(): ProjectionStatus
+    public function setUpStatus(): ProjectionSetupStatus
     {
         try {
             $this->dbal->connect();
         } catch (\Throwable $e) {
-            return ProjectionStatus::error(sprintf('Failed to connect to database: %s', $e->getMessage()));
+            return ProjectionSetupStatus::error(sprintf('Failed to connect to database: %s', $e->getMessage()));
         }
         try {
             $requiredSqlStatements = $this->determineRequiredSqlStatements();
         } catch (\Throwable $e) {
-            return ProjectionStatus::error(sprintf('Failed to determine required SQL statements: %s', $e->getMessage()));
+            return ProjectionSetupStatus::error(sprintf('Failed to determine required SQL statements: %s', $e->getMessage()));
         }
         if ($requiredSqlStatements !== []) {
-            return ProjectionStatus::setupRequired(sprintf('The following SQL statement%s required: %s', count($requiredSqlStatements) !== 1 ? 's are' : ' is', implode(chr(10), $requiredSqlStatements)));
+            return ProjectionSetupStatus::setupRequired(sprintf('The following SQL statement%s required: %s', count($requiredSqlStatements) !== 1 ? 's are' : ' is', implode(chr(10), $requiredSqlStatements)));
         }
 
-        return ProjectionStatus::ok();
+        return ProjectionSetupStatus::ok();
     }
 
     public function resetState(): void
