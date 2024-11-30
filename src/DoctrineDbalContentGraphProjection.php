@@ -56,8 +56,6 @@ use Neos\ContentRepository\Core\Feature\WorkspaceCreation\Event\WorkspaceWasCrea
 use Neos\ContentRepository\Core\Feature\WorkspaceModification\Event\WorkspaceBaseWorkspaceWasChanged;
 use Neos\ContentRepository\Core\Feature\WorkspaceModification\Event\WorkspaceWasRemoved;
 use Neos\ContentRepository\Core\Feature\WorkspacePublication\Event\WorkspaceWasDiscarded;
-use Neos\ContentRepository\Core\Feature\WorkspacePublication\Event\WorkspaceWasPartiallyDiscarded;
-use Neos\ContentRepository\Core\Feature\WorkspacePublication\Event\WorkspaceWasPartiallyPublished;
 use Neos\ContentRepository\Core\Feature\WorkspacePublication\Event\WorkspaceWasPublished;
 use Neos\ContentRepository\Core\Feature\WorkspaceRebase\Event\WorkspaceRebaseFailed;
 use Neos\ContentRepository\Core\Feature\WorkspaceRebase\Event\WorkspaceWasRebased;
@@ -196,8 +194,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
             WorkspaceRebaseFailed::class,
             WorkspaceWasCreated::class,
             WorkspaceWasDiscarded::class,
-            WorkspaceWasPartiallyDiscarded::class,
-            WorkspaceWasPartiallyPublished::class,
             WorkspaceWasPublished::class,
             WorkspaceWasRebased::class,
             WorkspaceWasRemoved::class,
@@ -233,8 +229,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
             WorkspaceRebaseFailed::class => $this->whenWorkspaceRebaseFailed($event),
             WorkspaceWasCreated::class => $this->whenWorkspaceWasCreated($event),
             WorkspaceWasDiscarded::class => $this->whenWorkspaceWasDiscarded($event),
-            WorkspaceWasPartiallyDiscarded::class => $this->whenWorkspaceWasPartiallyDiscarded($event),
-            WorkspaceWasPartiallyPublished::class => $this->whenWorkspaceWasPartiallyPublished($event),
             WorkspaceWasPublished::class => $this->whenWorkspaceWasPublished($event),
             WorkspaceWasRebased::class => $this->whenWorkspaceWasRebased($event),
             WorkspaceWasRemoved::class => $this->whenWorkspaceWasRemoved($event),
@@ -772,16 +766,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
     private function whenWorkspaceWasDiscarded(WorkspaceWasDiscarded $event): void
     {
         $this->updateWorkspaceContentStreamId($event->workspaceName, $event->newContentStreamId);
-    }
-
-    private function whenWorkspaceWasPartiallyDiscarded(WorkspaceWasPartiallyDiscarded $event): void
-    {
-        $this->updateWorkspaceContentStreamId($event->workspaceName, $event->newContentStreamId);
-    }
-
-    private function whenWorkspaceWasPartiallyPublished(WorkspaceWasPartiallyPublished $event): void
-    {
-        $this->updateWorkspaceContentStreamId($event->sourceWorkspaceName, $event->newSourceContentStreamId);
     }
 
     private function whenWorkspaceWasPublished(WorkspaceWasPublished $event): void
