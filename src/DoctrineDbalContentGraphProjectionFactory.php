@@ -34,7 +34,7 @@ final class DoctrineDbalContentGraphProjectionFactory implements ContentGraphPro
 
         $nodeFactory = new NodeFactory(
             $projectionFactoryDependencies->contentRepositoryId,
-            $projectionFactoryDependencies->propertyConverter,
+            $projectionFactoryDependencies->getPropertyConverter(),
             $dimensionSpacePointsRepository
         );
 
