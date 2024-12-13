@@ -790,8 +790,7 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
      */
     private function determineRequiredSqlStatements(): array
     {
-        $schemaManager = $this->dbal->createSchemaManager();
-        $schema = (new DoctrineDbalContentGraphSchemaBuilder($this->tableNames))->buildSchema($schemaManager);
+        $schema = (new DoctrineDbalContentGraphSchemaBuilder($this->tableNames))->buildSchema($this->dbal);
         return DbalSchemaDiff::determineRequiredSqlStatements($this->dbal, $schema);
     }
 
