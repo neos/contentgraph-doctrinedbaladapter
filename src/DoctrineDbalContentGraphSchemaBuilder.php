@@ -25,10 +25,6 @@ class DoctrineDbalContentGraphSchemaBuilder
     ) {
     }
 
-    /**
-     * @param AbstractSchemaManager<AbstractPlatform> $schemaManager
-     * @return Schema
-     */
     public function buildSchema(Connection $connection): Schema
     {
         return DbalSchemaFactory::createSchemaWithTables($connection, [
@@ -49,7 +45,7 @@ class DoctrineDbalContentGraphSchemaBuilder
             DbalSchemaFactory::columnForDimensionSpacePointHash('origindimensionspacepointhash', $platform)->setNotnull(false),
             DbalSchemaFactory::columnForNodeTypeName('nodetypename', $platform),
             (new Column('name', self::type(Types::STRING)))->setLength(255)->setNotnull(false),
-            (new Column('properties', self::type(Types::JSON)))->setNotnull(true),
+            DbalSchemaFactory::columnForProperties('properties', $platform)->setNotnull(true),
             (new Column('classification', self::type(Types::BINARY)))->setLength(20)->setNotnull(true),
             (new Column('created', self::type(Types::DATETIME_IMMUTABLE)))->setDefault('CURRENT_TIMESTAMP')->setNotnull(true),
             (new Column('originalcreated', self::type(Types::DATETIME_IMMUTABLE)))->setDefault('CURRENT_TIMESTAMP')->setNotnull(true),
@@ -100,7 +96,7 @@ class DoctrineDbalContentGraphSchemaBuilder
             (new Column('name', self::type(Types::STRING)))->setLength(255)->setNotnull(true),
             (new Column('position', self::type(Types::INTEGER)))->setNotnull(true),
             DbalSchemaFactory::columnForNodeAnchorPoint('nodeanchorpoint', $platform),
-            (new Column('properties', self::type(Types::JSON)))->setNotnull(false),
+            DbalSchemaFactory::columnForProperties('properties', $platform)->setNotnull(false),
             DbalSchemaFactory::columnForNodeAggregateId('destinationnodeaggregateid', $platform)->setNotnull(true)
         ]);
 
