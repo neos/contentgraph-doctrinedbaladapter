@@ -169,6 +169,22 @@ final class ContentGraph implements ContentGraphInterface
         );
     }
 
+    public function findNodeAggregatesByIds(
+        NodeAggregateIds $nodeAggregateIds
+    ): NodeAggregates {
+        $queryBuilder = $this->nodeQueryBuilder->buildBasicNodeAggregateQuery()
+            ->andWhere('n.nodeaggregateid in (:nodeAggregateIds)')
+            ->orderBy('n.relationanchorpoint', 'DESC')
+            ->setParameters([
+                'nodeAggregateIds' => $nodeAggregateIds->toStringArray(),
+                'contentStreamId' => $this->contentStreamId->value
+            ], [
+                'nodeAggregateIds' => ArrayParameterType::STRING
+            ]);
+
+        return $this->mapQueryBuilderToNodeAggregates($queryBuilder);
+    }
+
     /**
      * Parent node aggregates can have a greater dimension space coverage than the given child.
      * Thus, it is not enough to just resolve them from the nodes and edges connected to the given child node aggregate.
