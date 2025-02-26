@@ -23,6 +23,7 @@ use Neos\ContentGraph\DoctrineDbalAdapter\NodeQueryBuilder;
 use Neos\ContentRepository\Core\DimensionSpace\DimensionSpacePoint;
 use Neos\ContentRepository\Core\DimensionSpace\DimensionSpacePointSet;
 use Neos\ContentRepository\Core\DimensionSpace\OriginDimensionSpacePoint;
+use Neos\ContentRepository\Core\Feature\SubtreeTagging\Dto\SubtreeTag;
 use Neos\ContentRepository\Core\NodeType\NodeTypeManager;
 use Neos\ContentRepository\Core\NodeType\NodeTypeName;
 use Neos\ContentRepository\Core\NodeType\NodeTypeNames;
@@ -309,6 +310,19 @@ final class ContentGraph implements ContentGraphInterface
         }
 
         return new DimensionSpacePointSet($dimensionSpacePoints);
+    }
+
+    public function findNodeAggregatesTaggedWith(SubtreeTag $subtreeTag): NodeAggregates
+    {
+        $queryBuilder = $this->nodeQueryBuilder->buildBasicNodeAggregateQuery()
+            ->orderBy('n.relationanchorpoint', 'DESC')
+            ->andWhere('JSON_EXTRACT(h.subtreetags, :tagPath)')
+            ->setParameters([
+                'tagPath' => '$.' . $subtreeTag->value,
+                'contentStreamId' => $this->contentStreamId->value
+            ]);
+
+        return $this->mapQueryBuilderToNodeAggregates($queryBuilder);
     }
 
     public function findUsedNodeTypeNames(): NodeTypeNames
