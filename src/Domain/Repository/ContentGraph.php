@@ -314,9 +314,17 @@ final class ContentGraph implements ContentGraphInterface
 
     public function findNodeAggregatesTaggedWith(SubtreeTag $subtreeTag): NodeAggregates
     {
-        $queryBuilder = $this->nodeQueryBuilder->buildBasicNodeAggregateQuery()
+        $queryBuilder =  $this->createQueryBuilder()
+            ->select('n.*, h.contentstreamid, h.subtreetags, dsp.dimensionspacepoint AS covereddimensionspacepoint')
+            // select the subtree tags from tagged (t) h and then join h again to fetch all node rows in that aggregate
+            ->from($this->tableNames->hierarchyRelation(), 'th')
+            ->innerJoin('th', $this->tableNames->hierarchyRelation(), 'h', 'th.childnodeanchor = h.childnodeanchor')
+            ->innerJoin('h', $this->tableNames->node(), 'n', 'h.childnodeanchor = n.relationanchorpoint')
+            ->innerJoin('h', $this->tableNames->dimensionSpacePoints(), 'dsp', 'dsp.hash = h.dimensionspacepointhash')
+            ->where('th.contentstreamid = :contentStreamId')
+            ->andWhere('JSON_EXTRACT(th.subtreetags, :tagPath)')
+            ->andWhere('h.contentstreamid = :contentStreamId')
             ->orderBy('n.relationanchorpoint', 'DESC')
-            ->andWhere('JSON_EXTRACT(h.subtreetags, :tagPath)')
             ->setParameters([
                 'tagPath' => '$.' . $subtreeTag->value,
                 'contentStreamId' => $this->contentStreamId->value
