@@ -312,7 +312,7 @@ final class ContentGraph implements ContentGraphInterface
         return new DimensionSpacePointSet($dimensionSpacePoints);
     }
 
-    public function findNodeAggregatesTaggedWith(SubtreeTag $subtreeTag): NodeAggregates
+    public function findNodeAggregatesTaggedBy(SubtreeTag $subtreeTag): NodeAggregates
     {
         $queryBuilder =  $this->createQueryBuilder()
             ->select('n.*, h.contentstreamid, h.subtreetags, dsp.dimensionspacepoint AS covereddimensionspacepoint')
