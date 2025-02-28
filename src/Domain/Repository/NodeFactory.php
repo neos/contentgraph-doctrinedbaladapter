@@ -22,7 +22,6 @@ use Neos\ContentRepository\Core\Feature\SubtreeTagging\Dto\SubtreeTags;
 use Neos\ContentRepository\Core\Infrastructure\Property\PropertyConverter;
 use Neos\ContentRepository\Core\NodeType\NodeTypeName;
 use Neos\ContentRepository\Core\Projection\ContentGraph\CoverageByOrigin;
-use Neos\ContentRepository\Core\Projection\ContentGraph\DimensionSpacePointsBySubtreeTags;
 use Neos\ContentRepository\Core\Projection\ContentGraph\Node;
 use Neos\ContentRepository\Core\Projection\ContentGraph\NodeAggregate;
 use Neos\ContentRepository\Core\Projection\ContentGraph\NodeAggregates;
@@ -40,9 +39,7 @@ use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateClassification;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateId;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeName;
 use Neos\ContentRepository\Core\SharedModel\Node\ReferenceName;
-use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamId;
 use Neos\ContentRepository\Core\SharedModel\Workspace\WorkspaceName;
-use Traversable;
 
 /**
  * Implementation detail of ContentGraph and ContentSubgraph
@@ -167,7 +164,7 @@ final class NodeFactory
         $nodesByCoveredDimensionSpacePoints = [];
         $coverageByOccupants = [];
         $occupationByCovering = [];
-        $dimensionSpacePointsBySubtreeTags = DimensionSpacePointsBySubtreeTags::create();
+        $nodeTagsByCoveredDimensionSpacePoint = [];
 
         foreach ($nodeRows as $nodeRow) {
             // A node can occupy exactly one DSP and cover multiple ones...
@@ -197,10 +194,8 @@ final class NodeFactory
             $occupationByCovering[$coveredDimensionSpacePoint->hash] = $occupiedDimensionSpacePoint;
             $nodesByCoveredDimensionSpacePoints[$coveredDimensionSpacePoint->hash]
                 = $nodesByOccupiedDimensionSpacePoint[$occupiedDimensionSpacePoint->hash];
-            // ... as we do for explicit subtree tags
-            foreach (self::extractNodeTagsFromJson($nodeRow['subtreetags'])->withoutInherited() as $explicitTag) {
-                $dimensionSpacePointsBySubtreeTags = $dimensionSpacePointsBySubtreeTags->withSubtreeTagAndDimensionSpacePoint($explicitTag, $coveredDimensionSpacePoint);
-            }
+            // ... as we do for the subtree tags
+            $nodeTagsByCoveredDimensionSpacePoint[$coveredDimensionSpacePoint->hash] = self::extractNodeTagsFromJson($nodeRow['subtreetags']);
         }
         ksort($occupiedDimensionSpacePoints);
         ksort($coveredDimensionSpacePoints);
@@ -221,7 +216,7 @@ final class NodeFactory
             new DimensionSpacePointSet($coveredDimensionSpacePoints),
             $nodesByCoveredDimensionSpacePoints,
             OriginByCoverage::fromArray($occupationByCovering),
-            $dimensionSpacePointsBySubtreeTags,
+            $nodeTagsByCoveredDimensionSpacePoint,
         );
     }
 
@@ -249,7 +244,7 @@ final class NodeFactory
         $classificationByNodeAggregate = [];
         $coverageByOccupantsByNodeAggregate = [];
         $occupationByCoveringByNodeAggregate = [];
-        $dimensionSpacePointsBySubtreeTagsByNodeAggregate = [];
+        $nodeTagsByCoveredDimensionSpacePointByNodeAggregate = [];
 
         foreach ($nodeRows as $nodeRow) {
             // A node can occupy exactly one DSP and cover multiple ones...
@@ -293,13 +288,8 @@ final class NodeFactory
                 = $nodesByOccupiedDimensionSpacePointsByNodeAggregate
                     [$rawNodeAggregateId][$occupiedDimensionSpacePoint->hash];
 
-            // ... as we do for explicit subtree tags
-            if (!array_key_exists($rawNodeAggregateId, $dimensionSpacePointsBySubtreeTagsByNodeAggregate)) {
-                $dimensionSpacePointsBySubtreeTagsByNodeAggregate[$rawNodeAggregateId] = DimensionSpacePointsBySubtreeTags::create();
-            }
-            foreach (self::extractNodeTagsFromJson($nodeRow['subtreetags'])->withoutInherited() as $explicitTag) {
-                $dimensionSpacePointsBySubtreeTagsByNodeAggregate[$rawNodeAggregateId] = $dimensionSpacePointsBySubtreeTagsByNodeAggregate[$rawNodeAggregateId]->withSubtreeTagAndDimensionSpacePoint($explicitTag, $coveredDimensionSpacePoint);
-            }
+            // ... as we do for the subtree tags
+            $nodeTagsByCoveredDimensionSpacePointByNodeAggregate[$rawNodeAggregateId][$coveredDimensionSpacePoint->hash] = self::extractNodeTagsFromJson($nodeRow['subtreetags']);
         }
 
         foreach ($nodesByOccupiedDimensionSpacePointsByNodeAggregate as $rawNodeAggregateId => $nodes) {
@@ -326,7 +316,7 @@ final class NodeFactory
                 OriginByCoverage::fromArray(
                     $occupationByCoveringByNodeAggregate[$rawNodeAggregateId]
                 ),
-                $dimensionSpacePointsBySubtreeTagsByNodeAggregate[$rawNodeAggregateId],
+                $nodeTagsByCoveredDimensionSpacePointByNodeAggregate[$rawNodeAggregateId],
             );
         }
 
