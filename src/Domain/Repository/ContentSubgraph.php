@@ -328,6 +328,8 @@ final class ContentSubgraph implements ContentSubgraphInterface
             'queryBuilderRecursive' => $queryBuilderRecursive,
             'queryBuilderCte' => $queryBuilderCte
         ] = $this->buildAncestorNodesQueries($entryNodeAggregateId, $filter);
+        $queryBuilderCte->addOrderBy('level');
+
         $nodeRows = $this->fetchCteResults(
             $queryBuilderInitial,
             $queryBuilderRecursive,
@@ -560,7 +562,7 @@ final class ContentSubgraph implements ContentSubgraphInterface
     private function buildAncestorNodesQueries(NodeAggregateId $entryNodeAggregateId, FindAncestorNodesFilter|CountAncestorNodesFilter|FindClosestNodeFilter $filter): array
     {
         $queryBuilderInitial = $this->createQueryBuilder()
-            ->select('n.*, ph.subtreetags, ph.parentnodeanchor')
+            ->select('n.*, ph.subtreetags, ph.parentnodeanchor, 0 AS level')
             ->from($this->nodeQueryBuilder->tableNames->node(), 'n')
             // we need to join with the hierarchy relation, because we need the node name.
             ->innerJoin('n', $this->nodeQueryBuilder->tableNames->hierarchyRelation(), 'ch', 'ch.parentnodeanchor = n.relationanchorpoint')
@@ -575,7 +577,7 @@ final class ContentSubgraph implements ContentSubgraphInterface
         $this->addSubtreeTagConstraints($queryBuilderInitial, 'ch');
 
         $queryBuilderRecursive = $this->createQueryBuilder()
-            ->select('pn.*, h.subtreetags, h.parentnodeanchor')
+            ->select('pn.*, h.subtreetags, h.parentnodeanchor,  ch.level + 1 AS level')
             ->from('ancestry', 'ch')
             ->innerJoin('ch', $this->nodeQueryBuilder->tableNames->node(), 'pn', 'pn.relationanchorpoint = ch.parentnodeanchor')
             ->innerJoin('pn', $this->nodeQueryBuilder->tableNames->hierarchyRelation(), 'h', 'h.childnodeanchor = pn.relationanchorpoint')
