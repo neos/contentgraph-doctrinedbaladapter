@@ -68,18 +68,6 @@ final readonly class NodeQueryBuilder
             ]);
     }
 
-    public function buildParentNodeAggregateQuery(): QueryBuilder
-    {
-        return $this->createQueryBuilder()
-            ->select('n.*, h.contentstreamid, hp.subtreetags, dsp.dimensionspacepoint AS covereddimensionspacepoint')
-            ->from($this->tableNames->node(), 'n')
-            ->innerJoin('n', $this->tableNames->hierarchyRelation(), 'h', 'h.parentnodeanchor = n.relationanchorpoint')
-            ->innerJoin('h', $this->tableNames->hierarchyRelation(), 'hp', 'hp.childnodeanchor = h.parentnodeanchor')
-            ->innerJoin('hp', $this->tableNames->dimensionSpacePoints(), 'dsp', 'dsp.hash = hp.dimensionspacepointhash')
-            ->where('h.contentstreamid = :contentStreamId')
-            ->andWhere('hp.contentstreamid = :contentStreamId');
-    }
-
     public function buildFindRootNodeAggregatesQuery(ContentStreamId $contentStreamId, FindRootNodeAggregatesFilter $filter): QueryBuilder
     {
         $queryBuilder = $this->buildBasicNodeAggregateQuery()
