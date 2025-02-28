@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace Neos\ContentGraph\DoctrineDbalAdapter\Domain\Repository;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\DBAL\Query\QueryBuilder;
@@ -54,6 +55,7 @@ use Neos\ContentRepository\Core\Projection\ContentGraph\VisibilityConstraints;
 use Neos\ContentRepository\Core\SharedModel\ContentRepository\ContentRepositoryId;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateClassification;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateId;
+use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateIds;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeName;
 use Neos\ContentRepository\Core\SharedModel\Node\PropertyName;
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamId;
@@ -168,9 +170,19 @@ final class ContentSubgraph implements ContentSubgraphInterface
     public function findNodeById(NodeAggregateId $nodeAggregateId): ?Node
     {
         $queryBuilder = $this->nodeQueryBuilder->buildBasicNodeQuery($this->contentStreamId, $this->dimensionSpacePoint)
-            ->andWhere('n.nodeaggregateid = :nodeAggregateId')->setParameter('nodeAggregateId', $nodeAggregateId->value);
+            ->andWhere('n.nodeaggregateid = :nodeAggregateId')
+            ->setParameter('nodeAggregateId', $nodeAggregateId->value);
         $this->addSubtreeTagConstraints($queryBuilder);
         return $this->fetchNode($queryBuilder);
+    }
+
+    public function findNodesByIds(NodeAggregateIds $nodeAggregateIds): Nodes
+    {
+        $queryBuilder = $this->nodeQueryBuilder->buildBasicNodeQuery($this->contentStreamId, $this->dimensionSpacePoint)
+            ->andWhere('n.nodeaggregateid in (:nodeAggregateIds)')
+            ->setParameter('nodeAggregateIds', $nodeAggregateIds->toStringArray(), ArrayParameterType::STRING);
+        $this->addSubtreeTagConstraints($queryBuilder);
+        return $this->fetchNodes($queryBuilder);
     }
 
     public function findRootNodeByType(NodeTypeName $nodeTypeName): ?Node
