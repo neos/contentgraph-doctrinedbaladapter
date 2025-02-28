@@ -23,6 +23,7 @@ use Neos\ContentGraph\DoctrineDbalAdapter\NodeQueryBuilder;
 use Neos\ContentRepository\Core\DimensionSpace\DimensionSpacePoint;
 use Neos\ContentRepository\Core\DimensionSpace\DimensionSpacePointSet;
 use Neos\ContentRepository\Core\DimensionSpace\OriginDimensionSpacePoint;
+use Neos\ContentRepository\Core\Feature\SubtreeTagging\Dto\SubtreeTag;
 use Neos\ContentRepository\Core\NodeType\NodeTypeManager;
 use Neos\ContentRepository\Core\NodeType\NodeTypeName;
 use Neos\ContentRepository\Core\NodeType\NodeTypeNames;
@@ -326,6 +327,27 @@ final class ContentGraph implements ContentGraphInterface
         }
 
         return new DimensionSpacePointSet($dimensionSpacePoints);
+    }
+
+    public function findNodeAggregatesTaggedBy(SubtreeTag $subtreeTag): NodeAggregates
+    {
+        $queryBuilder =  $this->createQueryBuilder()
+            ->select('n.*, h.contentstreamid, h.subtreetags, dsp.dimensionspacepoint AS covereddimensionspacepoint')
+            // select the subtree tags from tagged (t) h and then join h again to fetch all node rows in that aggregate
+            ->from($this->tableNames->hierarchyRelation(), 'th')
+            ->innerJoin('th', $this->tableNames->hierarchyRelation(), 'h', 'th.childnodeanchor = h.childnodeanchor')
+            ->innerJoin('h', $this->tableNames->node(), 'n', 'h.childnodeanchor = n.relationanchorpoint')
+            ->innerJoin('h', $this->tableNames->dimensionSpacePoints(), 'dsp', 'dsp.hash = h.dimensionspacepointhash')
+            ->where('th.contentstreamid = :contentStreamId')
+            ->andWhere('JSON_EXTRACT(th.subtreetags, :tagPath)')
+            ->andWhere('h.contentstreamid = :contentStreamId')
+            ->orderBy('n.relationanchorpoint', 'DESC')
+            ->setParameters([
+                'tagPath' => '$.' . $subtreeTag->value,
+                'contentStreamId' => $this->contentStreamId->value
+            ]);
+
+        return $this->mapQueryBuilderToNodeAggregates($queryBuilder);
     }
 
     public function findUsedNodeTypeNames(): NodeTypeNames
