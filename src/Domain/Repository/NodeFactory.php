@@ -161,7 +161,6 @@ final class NodeFactory
         $occupiedDimensionSpacePoints = [];
         $nodesByOccupiedDimensionSpacePoint = [];
         $coveredDimensionSpacePoints = [];
-        $nodesByCoveredDimensionSpacePoints = [];
         $coverageByOccupants = [];
         $occupationByCovering = [];
         $nodeTagsByCoveredDimensionSpacePoint = [];
@@ -192,8 +191,6 @@ final class NodeFactory
             $coverageByOccupants[$occupiedDimensionSpacePoint->hash][$coveredDimensionSpacePoint->hash]
                 = $coveredDimensionSpacePoint;
             $occupationByCovering[$coveredDimensionSpacePoint->hash] = $occupiedDimensionSpacePoint;
-            $nodesByCoveredDimensionSpacePoints[$coveredDimensionSpacePoint->hash]
-                = $nodesByOccupiedDimensionSpacePoint[$occupiedDimensionSpacePoint->hash];
             // ... as we do for the subtree tags
             $nodeTagsByCoveredDimensionSpacePoint[$coveredDimensionSpacePoint->hash] = self::extractNodeTagsFromJson($nodeRow['subtreetags']);
         }
@@ -214,7 +211,6 @@ final class NodeFactory
             $nodesByOccupiedDimensionSpacePoint,
             CoverageByOrigin::fromArray($coverageByOccupants),
             new DimensionSpacePointSet($coveredDimensionSpacePoints),
-            $nodesByCoveredDimensionSpacePoints,
             OriginByCoverage::fromArray($occupationByCovering),
             $nodeTagsByCoveredDimensionSpacePoint,
         );
@@ -240,7 +236,6 @@ final class NodeFactory
         $occupiedDimensionSpacePointsByNodeAggregate = [];
         $nodesByOccupiedDimensionSpacePointsByNodeAggregate = [];
         $coveredDimensionSpacePointsByNodeAggregate = [];
-        $nodesByCoveredDimensionSpacePointsByNodeAggregate = [];
         $classificationByNodeAggregate = [];
         $coverageByOccupantsByNodeAggregate = [];
         $occupationByCoveringByNodeAggregate = [];
@@ -283,10 +278,6 @@ final class NodeFactory
 
             $coveredDimensionSpacePointsByNodeAggregate[$rawNodeAggregateId][$coveredDimensionSpacePoint->hash]
                 = $coveredDimensionSpacePoint;
-            $nodesByCoveredDimensionSpacePointsByNodeAggregate
-                [$rawNodeAggregateId][$coveredDimensionSpacePoint->hash]
-                = $nodesByOccupiedDimensionSpacePointsByNodeAggregate
-                    [$rawNodeAggregateId][$occupiedDimensionSpacePoint->hash];
 
             // ... as we do for the subtree tags
             $nodeTagsByCoveredDimensionSpacePointByNodeAggregate[$rawNodeAggregateId][$coveredDimensionSpacePoint->hash] = self::extractNodeTagsFromJson($nodeRow['subtreetags']);
@@ -311,8 +302,6 @@ final class NodeFactory
                 new DimensionSpacePointSet(
                     $coveredDimensionSpacePointsByNodeAggregate[$rawNodeAggregateId]
                 ),
-                $nodesByCoveredDimensionSpacePointsByNodeAggregate
-                    [$rawNodeAggregateId],
                 OriginByCoverage::fromArray(
                     $occupationByCoveringByNodeAggregate[$rawNodeAggregateId]
                 ),
