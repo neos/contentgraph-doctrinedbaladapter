@@ -166,7 +166,7 @@ final class ContentGraph implements ContentGraphInterface
         return $this->nodeFactory->mapNodeRowsToNodeAggregate(
             $this->fetchRows($queryBuilder),
             $this->workspaceName,
-            VisibilityConstraints::withoutRestrictions()
+            VisibilityConstraints::createEmpty()
         );
     }
 
@@ -274,7 +274,7 @@ final class ContentGraph implements ContentGraphInterface
         return $this->nodeFactory->mapNodeRowsToNodeAggregate(
             $this->fetchRows($queryBuilder),
             $this->workspaceName,
-            VisibilityConstraints::withoutRestrictions()
+            VisibilityConstraints::createEmpty()
         );
     }
 
@@ -368,7 +368,7 @@ final class ContentGraph implements ContentGraphInterface
         return $this->nodeFactory->mapNodeRowsToNodeAggregate(
             $this->fetchRows($queryBuilder),
             $this->workspaceName,
-            VisibilityConstraints::withoutRestrictions()
+            VisibilityConstraints::createEmpty()
         );
     }
 
@@ -381,7 +381,7 @@ final class ContentGraph implements ContentGraphInterface
         return $this->nodeFactory->mapNodeRowsToNodeAggregates(
             $this->fetchRows($queryBuilder),
             $this->workspaceName,
-            VisibilityConstraints::withoutRestrictions()
+            VisibilityConstraints::createEmpty()
         );
     }
 
