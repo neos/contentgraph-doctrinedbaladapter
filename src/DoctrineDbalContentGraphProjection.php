@@ -616,14 +616,6 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
             return;
         }
 
-        $outgoingRelations = $this->projectionContentGraph->findOutgoingHierarchyRelationsForNode($rootNodeAnchorPoint, $event->contentStreamId);
-        foreach ($outgoingRelations as $outgoingRelation) {
-            if (!$event->coveredDimensionSpacePoints->contains($outgoingRelation->dimensionSpacePoint)) {
-                // remove hierarchy edges which are obsolete now
-                $this->removeRelationRecursivelyFromDatabaseIncludingNonReferencedNodes($outgoingRelation);
-            }
-        }
-
         // delete all hierarchy edges of the root node
         $deleteHierarchyRelationsStatement = <<<SQL
             DELETE FROM {$this->tableNames->hierarchyRelation()}
