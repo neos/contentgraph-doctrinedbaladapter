@@ -93,7 +93,8 @@ final class ProjectionIntegrityViolationDetector implements ProjectionIntegrityV
         $hierarchyRelationsAppearingMultipleTimesStatement = <<<SQL
             SELECT
                 COUNT(*) as uniquenessCounter,
-                h.* FROM {$this->tableNames->hierarchyRelation()} h
+                c.nodeaggregateid,
+                h.dimensionspacepointhash, h.contentstreamid FROM {$this->tableNames->hierarchyRelation()} h
                 LEFT JOIN {$this->tableNames->node()} p ON h.parentnodeanchor = p.relationanchorpoint
                 LEFT JOIN {$this->tableNames->node()} c ON h.childnodeanchor = c.relationanchorpoint
             WHERE
@@ -135,7 +136,10 @@ final class ProjectionIntegrityViolationDetector implements ProjectionIntegrityV
                 position,
                 parentnodeanchor,
                 contentstreamid,
-                dimensionspacepointhash
+                dimensionspacepointhash,
+                parentnodeanchor,
+                childnodeanchor,
+                subtreetags
             HAVING
                 COUNT(position) > 1
         SQL;
@@ -227,7 +231,7 @@ final class ProjectionIntegrityViolationDetector implements ProjectionIntegrityV
                     AND ph.dimensionspacepointhash = h.dimensionspacepointhash
             WHERE
                 EXISTS (
-                    SELECT t.tag FROM JSON_TABLE(JSON_KEYS(ph.subtreetags), '\$[*]' COLUMNS(tag VARCHAR(30) PATH '\$')) t WHERE NOT JSON_EXISTS(h.subtreetags, CONCAT('\$.', t.tag))
+                    SELECT t.tag FROM JSON_TABLE(JSON_KEYS(ph.subtreetags), '\$[*]' COLUMNS(tag VARCHAR(30) PATH '\$')) t WHERE JSON_CONTAINS_PATH(h.subtreetags, 'all', CONCAT('\$.', t.tag)) = 0
                 )
         SQL;
         try {
@@ -293,7 +297,9 @@ final class ProjectionIntegrityViolationDetector implements ProjectionIntegrityV
                 WHERE
                     d.nodeaggregateid IS NULL
                 GROUP BY
-                    s.nodeaggregateid
+                    s.nodeaggregateid,
+                    sh.contentstreamid,
+                    r.destinationnodeaggregateid
         SQL;
         try {
             $referenceRelationRecordsWithInvalidTarget = $this->dbal->fetchAllAssociative($referenceRelationRecordsWithInvalidTargetStatement);
