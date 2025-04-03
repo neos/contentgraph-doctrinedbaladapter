@@ -196,7 +196,7 @@ trait SubtreeTagging
               AND h.dimensionspacepointhash = :dimensionSpacePointHash
         SQL;
         try {
-            // Mysql hack
+            // Mysql hack, too eager to optimize https://dev.mysql.com/doc/refman/8.4/en/derived-table-optimization.html
             $this->dbal->executeQuery('set optimizer_switch="derived_merge=off"');
             $this->dbal->executeStatement($moveSubtreeTagsStatement, [
                 'contentStreamId' => $contentStreamId->value,

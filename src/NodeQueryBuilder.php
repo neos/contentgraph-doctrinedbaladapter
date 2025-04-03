@@ -210,14 +210,20 @@ final readonly class NodeQueryBuilder
 
     private function comparePropertyValueStatement(QueryBuilder $queryBuilder, PropertyName $propertyName, string|int|float|bool $value, string $operator, string $nodeTableAlias): string
     {
-        $paramName = $this->createUniqueParameterName();
-        $paramType = match (gettype($value)) {
-            'boolean' => ParameterType::BOOLEAN,
-            'integer' => ParameterType::INTEGER,
-            default => ParameterType::STRING,
-        };
-        $queryBuilder->setParameter($paramName, $value, $paramType);
+        if (gettype($value) === 'boolean') {
+            return $this->extractPropertyValue($propertyName, $nodeTableAlias) . ' ' . $operator . ($value ? 'true' : 'false');
+        }
 
+        if (gettype($value) === 'integer') {
+            return $this->extractPropertyValue($propertyName, $nodeTableAlias) . ' ' . $operator . $value;
+        }
+
+        if (gettype($value) === 'double') {
+            return $this->extractPropertyValue($propertyName, $nodeTableAlias) . ' ' . $operator . $value;
+        }
+
+        $paramName = $this->createUniqueParameterName();
+        $queryBuilder->setParameter($paramName, $value);
         return $this->extractPropertyValue($propertyName, $nodeTableAlias) . ' ' . $operator . ' :' . $paramName;
     }
 
@@ -232,18 +238,17 @@ final readonly class NodeQueryBuilder
         return 'JSON_EXTRACT(' . $nodeTableAlias . '.properties, \'$.' . $escapedPropertyName . '.value\')';
     }
 
-    private function searchPropertyValueStatement(QueryBuilder $queryBuilder, PropertyName $propertyName, string|bool|int|float $value, string $nodeTableAlias, bool $caseSensitive): string
+    private function searchPropertyValueStatement(QueryBuilder $queryBuilder, PropertyName $propertyName, string $value, string $nodeTableAlias, bool $caseSensitive): string
     {
         try {
             $escapedPropertyName = addslashes(json_encode($propertyName->value, JSON_THROW_ON_ERROR));
         } catch (\JsonException $e) {
             throw new \RuntimeException(sprintf('Failed to escape property name: %s', $e->getMessage()), 1679394579, $e);
         }
-        if (is_bool($value)) {
-            return 'JSON_SEARCH(' . $nodeTableAlias . '.properties, \'one\', \'' . ($value ? 'true' : 'false') . '\', NULL, \'$.' . $escapedPropertyName . '.value\') IS NOT NULL';
-        }
+
         $paramName = $this->createUniqueParameterName();
         $queryBuilder->setParameter($paramName, $value);
+
         if ($caseSensitive) {
             return 'JSON_SEARCH(' . $nodeTableAlias . '.properties COLLATE utf8mb4_bin, \'one\', :' . $paramName . ' COLLATE utf8mb4_bin, NULL, \'$.' . $escapedPropertyName . '.value\') IS NOT NULL';
         }

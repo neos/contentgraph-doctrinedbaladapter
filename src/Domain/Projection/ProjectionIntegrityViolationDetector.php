@@ -128,7 +128,7 @@ final class ProjectionIntegrityViolationDetector implements ProjectionIntegrityV
 
         $ambiguouslySortedHierarchyRelationStatement = <<<SQL
             SELECT
-                *,
+                contentstreamid, dimensionspacepointhash, parentnodeanchor,
                 COUNT(position)
             FROM
                 {$this->tableNames->hierarchyRelation()}
@@ -136,10 +136,7 @@ final class ProjectionIntegrityViolationDetector implements ProjectionIntegrityV
                 position,
                 parentnodeanchor,
                 contentstreamid,
-                dimensionspacepointhash,
-                parentnodeanchor,
-                childnodeanchor,
-                subtreetags
+                dimensionspacepointhash
             HAVING
                 COUNT(position) > 1
         SQL;
@@ -156,13 +153,15 @@ final class ProjectionIntegrityViolationDetector implements ProjectionIntegrityV
 
         $ambiguouslySortedNodesStatement = <<<SQL
             SELECT nodeaggregateid
-            FROM {$this->tableNames->node()}
-            WHERE relationanchorpoint = :relationAnchorPoint
+            FROM {$this->tableNames->node()} n
+            LEFT JOIN {$this->tableNames->hierarchyRelation()} ph
+            ON ph.childnodeanchor = n.relationanchorpoint
+            WHERE ph.parentnodeanchor = :relationAnchorPoint
         SQL;
         foreach ($ambiguouslySortedHierarchyRelationRecords->iterateAssociative() as $hierarchyRelationRecord) {
             try {
                 $ambiguouslySortedNodeRecords = $this->dbal->fetchAllAssociative($ambiguouslySortedNodesStatement, [
-                    'relationAnchorPoint' => $hierarchyRelationRecord['childnodeanchor']
+                    'relationAnchorPoint' => $hierarchyRelationRecord['parentnodeanchor'],
                 ]);
             } catch (DBALException $e) {
                 throw new \RuntimeException(sprintf('Failed to load ambiguously sorted nodes: %s', $e->getMessage()), 1716492358, $e);
