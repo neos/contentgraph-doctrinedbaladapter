@@ -476,7 +476,7 @@ final class ContentSubgraph implements ContentSubgraphInterface
         $hierarchyRelationTablePrefix = $hierarchyRelationTableAlias === '' ? '' : $hierarchyRelationTableAlias . '.';
         $i = 0;
         foreach ($this->visibilityConstraints->excludedSubtreeTags as $excludedTag) {
-            $queryBuilder->andWhere('NOT JSON_CONTAINS_PATH(' . $hierarchyRelationTablePrefix . 'subtreetags, \'one\', :tagPath' . $i . ')')->setParameter('tagPath' . $i, '$.' . $excludedTag->value);
+            $queryBuilder->andWhere('NOT JSON_CONTAINS_PATH(' . $hierarchyRelationTablePrefix . 'subtreetags, \'one\', :tagPath' . $i . ')')->setParameter('tagPath' . $i, '$."' . $excludedTag->value . '"');
             $i++;
         }
     }

@@ -339,11 +339,11 @@ final class ContentGraph implements ContentGraphInterface
             ->innerJoin('h', $this->tableNames->node(), 'n', 'h.childnodeanchor = n.relationanchorpoint')
             ->innerJoin('h', $this->tableNames->dimensionSpacePoints(), 'dsp', 'dsp.hash = h.dimensionspacepointhash')
             ->where('th.contentstreamid = :contentStreamId')
-            ->andWhere('JSON_EXTRACT(th.subtreetags, :tagPath)')
+            ->andWhere('JSON_EXTRACT(th.subtreetags, :tagPath) LIKE "true"')
             ->andWhere('h.contentstreamid = :contentStreamId')
             ->orderBy('n.relationanchorpoint', 'DESC')
             ->setParameters([
-                'tagPath' => '$.' . $subtreeTag->value,
+                'tagPath' => '$."' . $subtreeTag->value . '"',
                 'contentStreamId' => $this->contentStreamId->value
             ]);
 
