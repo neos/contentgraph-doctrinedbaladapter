@@ -100,7 +100,8 @@ class DoctrineDbalContentGraphSchemaBuilder
         ]);
 
         return $table
-            ->setPrimaryKey(['name', 'position', 'nodeanchorpoint']);
+            ->setPrimaryKey(['name', 'position', 'nodeanchorpoint'])
+            ->addIndex(['nodeanchorpoint', 'destinationnodeaggregateid', 'position'], 'referenceresolution');
     }
 
     private function createWorkspaceTable(AbstractPlatform $platform): Table
