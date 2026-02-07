@@ -355,6 +355,7 @@ final class DoctrineDbalContentGraphProjection implements ContentGraphProjection
                 -- find only nodes which have their ORIGIN at the source DimensionSpacePoint,
                 -- as we need to rewrite these origins (using copy on write)
                 AND n.origindimensionspacepointhash = :dimensionSpacePointHash
+            WHERE n.classification != "root"
         SQL;
         try {
             $relationAnchorPoints = $this->dbal->fetchFirstColumn($selectRelationsStatement, [
