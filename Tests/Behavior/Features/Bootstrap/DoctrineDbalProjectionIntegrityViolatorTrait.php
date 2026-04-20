@@ -12,8 +12,6 @@
 
 declare(strict_types=1);
 
-namespace Neos\ContentGraph\DoctrineDbalAdapter\Tests\Behavior\Features\Bootstrap;
-
 use Behat\Gherkin\Node\TableNode;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception as DBALException;
@@ -24,26 +22,18 @@ use Neos\ContentGraph\DoctrineDbalAdapter\Tests\Behavior\Features\Bootstrap\Help
 use Neos\ContentRepository\Core\DimensionSpace\DimensionSpacePoint;
 use Neos\ContentRepository\Core\DimensionSpace\OriginDimensionSpacePoint;
 use Neos\ContentRepository\Core\Feature\SubtreeTagging\Dto\SubtreeTag;
-use Neos\ContentRepository\Core\Projection\ContentGraph\ProjectionIntegrityViolationDetectionRunnerFactoryInterface;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateId;
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamId;
 use Neos\ContentRepository\TestSuite\Behavior\Features\Bootstrap\CRTestSuiteRuntimeVariables;
-use Neos\Error\Messages\Error;
-use Neos\Error\Messages\Result;
-use PHPUnit\Framework\Assert;
 
 /**
- * Custom context trait for projection integrity violation detection specific to the Doctrine DBAL content graph adapter
- *
- * @todo move this class somewhere where its autoloaded
+ * @internal custom illegal mutations for the Doctrine DBAL content graph adapter to make the projection integrity violation fail
  */
-trait ProjectionIntegrityViolationDetectionTrait
+trait DoctrineDbalProjectionIntegrityViolatorTrait
 {
     use CRTestSuiteRuntimeVariables;
 
     private Connection $dbal;
-
-    protected Result $lastIntegrityViolationDetectionResult;
 
     /**
      * @template T of object
@@ -336,44 +326,5 @@ trait ProjectionIntegrityViolationDetectionTrait
         }
 
         return $result;
-    }
-
-    /**
-     * @When /^I run integrity violation detection$/
-     */
-    public function iRunIntegrityViolationDetection(): void
-    {
-        $projectionIntegrityViolationDetectionRunner = $this->getContentRepositoryService(
-            $this->getObject(ProjectionIntegrityViolationDetectionRunnerFactoryInterface::class)
-        );
-        $this->lastIntegrityViolationDetectionResult = $projectionIntegrityViolationDetectionRunner->run();
-    }
-
-    /**
-     * @Then /^I expect the integrity violation detection result to contain exactly (\d+) errors?$/
-     * @param int $expectedNumberOfErrors
-     */
-    public function iExpectTheIntegrityViolationDetectionResultToContainExactlyNErrors(int $expectedNumberOfErrors): void
-    {
-        Assert::assertCount(
-            $expectedNumberOfErrors,
-            $this->lastIntegrityViolationDetectionResult->getErrors(),
-            'Errors were: ' . implode(', ', array_map(fn (Error $e) => $e->render(), $this->lastIntegrityViolationDetectionResult->getErrors()))
-        );
-    }
-
-    /**
-     * @Then /^I expect integrity violation detection result error number (\d+) to have code (\d+)$/
-     * @param int $errorNumber
-     * @param int $expectedErrorCode
-     */
-    public function iExpectIntegrityViolationDetectionResultErrorNumberNToHaveCodeX(int $errorNumber, int $expectedErrorCode): void
-    {
-        /** @var Error $error */
-        $error = $this->lastIntegrityViolationDetectionResult->getErrors()[$errorNumber-1];
-        Assert::assertSame(
-            $expectedErrorCode,
-            $error->getCode()
-        );
     }
 }
