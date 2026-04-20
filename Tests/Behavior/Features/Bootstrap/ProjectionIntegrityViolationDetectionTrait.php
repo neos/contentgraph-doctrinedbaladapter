@@ -19,12 +19,12 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\DBAL\Exception\InvalidArgumentException;
 use Neos\ContentGraph\DoctrineDbalAdapter\ContentGraphTableNames;
-use Neos\ContentGraph\DoctrineDbalAdapter\DoctrineDbalProjectionIntegrityViolationDetectionRunnerFactory;
 use Neos\ContentGraph\DoctrineDbalAdapter\Domain\Repository\NodeFactory;
 use Neos\ContentGraph\DoctrineDbalAdapter\Tests\Behavior\Features\Bootstrap\Helpers\TestingNodeAggregateId;
 use Neos\ContentRepository\Core\DimensionSpace\DimensionSpacePoint;
 use Neos\ContentRepository\Core\DimensionSpace\OriginDimensionSpacePoint;
 use Neos\ContentRepository\Core\Feature\SubtreeTagging\Dto\SubtreeTag;
+use Neos\ContentRepository\Core\Projection\ContentGraph\ProjectionIntegrityViolationDetectionRunnerFactoryInterface;
 use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateId;
 use Neos\ContentRepository\Core\SharedModel\Workspace\ContentStreamId;
 use Neos\ContentRepository\TestSuite\Behavior\Features\Bootstrap\CRTestSuiteRuntimeVariables;
@@ -343,7 +343,9 @@ trait ProjectionIntegrityViolationDetectionTrait
      */
     public function iRunIntegrityViolationDetection(): void
     {
-        $projectionIntegrityViolationDetectionRunner = $this->getContentRepositoryService(new DoctrineDbalProjectionIntegrityViolationDetectionRunnerFactory($this->dbal));
+        $projectionIntegrityViolationDetectionRunner = $this->getContentRepositoryService(
+            $this->getObject(ProjectionIntegrityViolationDetectionRunnerFactoryInterface::class)
+        );
         $this->lastIntegrityViolationDetectionResult = $projectionIntegrityViolationDetectionRunner->run();
     }
 
